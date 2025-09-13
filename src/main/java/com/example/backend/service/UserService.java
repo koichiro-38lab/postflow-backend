@@ -1,47 +1,80 @@
 package com.example.backend.service;
 
+import com.example.backend.dto.user.UserMapper;
+import com.example.backend.dto.user.UserRequestDto;
+import com.example.backend.dto.user.UserResponseDto;
 import com.example.backend.entity.User;
+import com.example.backend.exception.UserNotFoundException;
+import com.example.backend.exception.DuplicateEmailException;
 import com.example.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.Sort;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 public class UserService {
 
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder; // ← SecurityConfigで登録したBeanを注入
 
-    // ユーザー作成
-    public User createUser(User user) {
-        return userRepository.save(user);
+    public UserResponseDto createUser(UserRequestDto dto) {
+        User user = new User();
+        user.setEmail(dto.email());
+        user.setPasswordHash(passwordEncoder.encode(dto.password())); // ← ハッシュ化して保存
+        user.setRole(dto.role()); // Enumで受けてる場合
+        User saved = userRepository.save(user);
+
+        return new UserResponseDto(saved.getId(), saved.getEmail(), saved.getRole());
     }
 
-    // 全件取得
-    public List<User> getAllUsers() {
-        return userRepository.findAll();
+    // 全ユーザー取得
+    public List<UserResponseDto> getAllUsers() {
+        return userRepository.findAll(Sort.by(Sort.Direction.ASC, "id"))
+                .stream()
+                .map(UserMapper::toResponseDto)
+                .toList();
     }
 
-    // IDで検索
-    public Optional<User> getUserById(Long id) {
-        return userRepository.findById(id);
-    }
-
-    // Emailで検索
-    public Optional<User> getUserByEmail(String email) {
-        return userRepository.findByEmail(email);
+    // IDでユーザー取得
+    public UserResponseDto getUserById(Long id) {
+        return userRepository.findById(id)
+                .map(UserMapper::toResponseDto)
+                .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
     // 更新
-    public User updateUser(User user) {
-        return userRepository.save(user);
+    public UserResponseDto updateUser(Long id, UserRequestDto dto) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        // email変更時の重複チェック
+        if (!user.getEmail().equals(dto.email()) && userRepository.existsByEmail(dto.email())) {
+            throw new DuplicateEmailException("Email already exists");
+        }
+        user.setEmail(dto.email());
+
+        // パスワードが空でなければ更新
+        if (dto.password() != null && !dto.password().isBlank()) {
+            user.setPasswordHash(passwordEncoder.encode(dto.password()));
+        }
+
+        // ロール更新
+        user.setRole(dto.role());
+
+        User updated = userRepository.save(user);
+        return UserMapper.toResponseDto(updated);
     }
 
     // 削除
     public void deleteUser(Long id) {
+        if (!userRepository.existsById(id)) {
+            throw new UserNotFoundException("User not found");
+        }
         userRepository.deleteById(id);
     }
 }

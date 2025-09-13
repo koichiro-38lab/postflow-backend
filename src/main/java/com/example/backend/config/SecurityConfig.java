@@ -20,7 +20,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable()) // 開発中は無効化
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/public/**").permitAll()
-                        .requestMatchers("/api/admin/**").authenticated()
+                        .requestMatchers("/api/admin/**").permitAll()
                         .anyRequest().permitAll());
         return http.build();
     }

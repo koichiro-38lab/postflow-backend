@@ -125,8 +125,8 @@
                 <artifactId>maven-resources-plugin</artifactId>
                 <version>3.3.1</version>
                 <configuration>
-                    <!-- 以前のパーミッションエラーを回避するための設定 -->
-                    <skipCopyPermissions>true</skipCopyPermissions>
+                    <!-- 一部環境（読み取り専用/Posix不可）で chmod が失敗するため属性コピーを無効化 -->
+                    <preserveAttributes>false</preserveAttributes>
                 </configuration>
             </plugin>
 

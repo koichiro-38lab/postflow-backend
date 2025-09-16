@@ -8,8 +8,7 @@ public class UserMapper {
     public static User toEntity(UserRequestDto dto) {
         User user = new User();
         user.setEmail(dto.email());
-        user.setPasswordHash(dto.password());
-        user.setRole(User.Role.valueOf(dto.role().name()));
+        user.setRole(User.Role.valueOf(dto.role()));
         return user;
     }
 

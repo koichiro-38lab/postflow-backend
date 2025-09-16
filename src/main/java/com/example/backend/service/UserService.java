@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Sort;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -20,15 +21,22 @@ import java.util.List;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder; // ← SecurityConfigで登録したBeanを注入
+    private final PasswordEncoder passwordEncoder;
 
+    @Transactional
     public UserResponseDto createUser(UserRequestDto dto) {
+        if (userRepository.existsByEmail(dto.email())) {
+            throw new DuplicateEmailException("Email already exists");
+        }
+        // Roleチェック（サービス層）
+        if (dto.role() == null || !isValidRole(dto.role())) {
+            throw new com.example.backend.exception.InvalidRoleException("Invalid role");
+        }
         User user = new User();
         user.setEmail(dto.email());
-        user.setPasswordHash(passwordEncoder.encode(dto.password())); // ← ハッシュ化して保存
-        user.setRole(dto.role()); // Enumで受けてる場合
+        user.setPasswordHash(passwordEncoder.encode(dto.password()));
+        user.setRole(User.Role.valueOf(dto.role()));
         User saved = userRepository.save(user);
-
         return new UserResponseDto(saved.getId(), saved.getEmail(), saved.getRole());
     }
 
@@ -48,13 +56,18 @@ public class UserService {
     }
 
     // 更新
+    @Transactional
     public UserResponseDto updateUser(Long id, UserRequestDto dto) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
 
-        // email変更時の重複チェック
+        // メールアドレスが変更されていて、かつ既に存在する場合
         if (!user.getEmail().equals(dto.email()) && userRepository.existsByEmail(dto.email())) {
             throw new DuplicateEmailException("Email already exists");
+        }
+        // Roleチェック（サービス層）
+        if (dto.role() == null || !isValidRole(dto.role())) {
+            throw new com.example.backend.exception.InvalidRoleException("Invalid role");
         }
         user.setEmail(dto.email());
 
@@ -64,10 +77,20 @@ public class UserService {
         }
 
         // ロール更新
-        user.setRole(dto.role());
+        user.setRole(User.Role.valueOf(dto.role()));
 
         User updated = userRepository.save(user);
         return UserMapper.toResponseDto(updated);
+    }
+
+    // 許可されたロールか判定（String型）
+    private boolean isValidRole(String role) {
+        try {
+            User.Role.valueOf(role);
+            return true;
+        } catch (IllegalArgumentException | NullPointerException e) {
+            return false;
+        }
     }
 
     // 削除

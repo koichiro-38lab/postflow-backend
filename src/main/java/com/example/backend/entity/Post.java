@@ -1,6 +1,8 @@
 package com.example.backend.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -32,6 +34,7 @@ public class Post {
     private String excerpt;
 
     @Column(name = "content_json", columnDefinition = "jsonb", nullable = false)
+    @JdbcTypeCode(SqlTypes.JSON)
     private String contentJson;
 
     @ManyToOne(fetch = FetchType.LAZY)

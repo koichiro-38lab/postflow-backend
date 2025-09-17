@@ -1,0 +1,578 @@
+package com.example.backend.controller.admin;
+
+import com.example.backend.config.TestClockConfig;
+import com.example.backend.config.TestDataConfig;
+import com.example.backend.dto.auth.LoginRequestDto;
+import com.example.backend.dto.post.PostRequestDto;
+import com.example.backend.entity.Post;
+import com.example.backend.repository.PostRepository;
+import com.example.backend.repository.UserRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jayway.jsonpath.JsonPath;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@Import({ TestClockConfig.class, TestDataConfig.class })
+@org.springframework.test.context.ActiveProfiles("test")
+class PostControllerTest {
+    @Autowired
+    MockMvc mockMvc;
+    @Autowired
+    ObjectMapper objectMapper;
+    @Autowired
+    PostRepository postRepository;
+    @Autowired
+    UserRepository userRepository;
+
+    private List<Long> createdPostIds = new ArrayList<>();
+
+    @AfterEach
+    void tearDown() {
+        createdPostIds.forEach(postRepository::deleteById);
+        createdPostIds.clear();
+    }
+
+    // 投稿作成成功
+    @Test
+    void createPost_success_should_return_201() throws Exception {
+        String accessToken = getAccessToken("author@example.com", "password123");
+        // 実際のauthorIdを取得
+        Long authorId = userRepository.findByEmail("author@example.com").orElseThrow().getId();
+        var req = PostRequestDto.builder()
+                .title("タイトル")
+                .slug("test-title")
+                .status("DRAFT")
+                .contentJson("{\"ops\":[{\"insert\":\"本文\"}]}")
+                .authorId(authorId)
+                .excerpt("概要")
+                .build();
+        var res = mockMvc.perform(post("/api/admin/posts")
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").exists())
+                .andExpect(jsonPath("$.title").value("タイトル"))
+                .andReturn().getResponse().getContentAsString();
+        Long postId = Long.valueOf((Integer) JsonPath.read(res, "$.id"));
+        createdPostIds.add(postId);
+    }
+
+    // タイトル空
+    @Test
+    void createPost_blankTitle_should_return_400() throws Exception {
+        String accessToken = getAccessToken("author@example.com", "password123");
+
+        // 実際のauthorIdを取得
+        Long authorId = userRepository.findByEmail("author@example.com").orElseThrow().getId();
+
+        var req = PostRequestDto.builder()
+                .title("")
+                .slug("test-title-2")
+                .status("DRAFT")
+                .contentJson("{\"ops\":[{\"insert\":\"本文\"}]}")
+                .authorId(authorId)
+                .build();
+        mockMvc.perform(post("/api/admin/posts")
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.messages[0].field").value("title"));
+    }
+
+    // 他人による更新禁止
+    @Test
+    void updatePost_byOtherUser_should_return_403() throws Exception {
+        String editorToken = getAccessToken("editor@example.com", "password123");
+        String otherToken = getAccessToken("author@example.com", "password123");
+
+        // 実際のauthorIdを取得
+        Long authorId = userRepository.findByEmail("editor@example.com").orElseThrow().getId();
+
+        // まず editor で投稿作成
+        var req = PostRequestDto.builder()
+                .title("original")
+                .slug("original-slug")
+                .status("DRAFT")
+                .contentJson("{\"ops\":[{\"insert\":\"body\"}]}")
+                .authorId(authorId)
+                .build();
+        var res = mockMvc.perform(post("/api/admin/posts")
+                .header("Authorization", "Bearer " + editorToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long postId = Long.valueOf((Integer) JsonPath.read(res, "$.id"));
+        createdPostIds.add(postId);
+        // other で更新
+        var updateReq = PostRequestDto.builder()
+                .title("hacked")
+                .slug("original-slug")
+                .status("DRAFT")
+                .contentJson("{\"ops\":[{\"insert\":\"body\"}]}")
+                .authorId(2L)
+                .build();
+        mockMvc.perform(put("/api/admin/posts/" + postId)
+                .header("Authorization", "Bearer " + otherToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateReq)))
+                .andExpect(status().isForbidden());
+    }
+
+    // 存在しない投稿取得
+    @Test
+    void getPost_notFound_should_return_404() throws Exception {
+        String accessToken = getAccessToken("author@example.com", "password123");
+        mockMvc.perform(get("/api/admin/posts/999999")
+                .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isNotFound());
+    }
+
+    // 未認証ユーザーによる作成は401
+    @Test
+    void createPost_unauthenticated_should_return_401() throws Exception {
+        Long authorId = userRepository.findByEmail("author@example.com").orElseThrow().getId();
+        var req = PostRequestDto.builder()
+                .title("タイトル")
+                .slug("unauth-title")
+                .status("DRAFT")
+                .contentJson("{\"ops\":[{\"insert\":\"本文\"}]}")
+                .authorId(authorId)
+                .excerpt("概要")
+                .build();
+        mockMvc.perform(post("/api/admin/posts")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    // 他人の投稿削除は403
+    @Test
+    void deletePost_byOtherUser_should_return_403() throws Exception {
+        String editorToken = getAccessToken("editor@example.com", "password123");
+        String otherToken = getAccessToken("author@example.com", "password123");
+        Long authorId = userRepository.findByEmail("editor@example.com").orElseThrow().getId();
+
+        // 投稿作成
+        var req = PostRequestDto.builder()
+                .title("original")
+                .slug("original-slug2")
+                .status("DRAFT")
+                .contentJson("{\"ops\":[{\"insert\":\"body\"}]}")
+                .authorId(authorId)
+                .excerpt("概要")
+                .build();
+        var res = mockMvc.perform(post("/api/admin/posts")
+                .header("Authorization", "Bearer " + editorToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long postId = Long.valueOf((Integer) JsonPath.read(res, "$.id"));
+        createdPostIds.add(postId);
+
+        // 他人で削除
+        mockMvc.perform(delete("/api/admin/posts/" + postId)
+                .header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isForbidden());
+    }
+
+    // authorロールは自分の投稿だけ取得できる
+    @Test
+    void adminApi_access_by_author_should_return_own_posts_only() throws Exception {
+        // authorユーザーで投稿を作成
+        String authorToken = getAccessToken("author@example.com", "password123");
+        Long authorId = userRepository.findByEmail("author@example.com").orElseThrow().getId();
+
+        var req = PostRequestDto.builder()
+                .title("editor投稿")
+                .slug("editor-post")
+                .status("DRAFT")
+                .contentJson("{\"ops\":[{\"insert\":\"本文\"}]}")
+                .authorId(authorId)
+                .excerpt("概要")
+                .build();
+        var res = mockMvc.perform(post("/api/admin/posts")
+                .header("Authorization", "Bearer " + authorToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long postId = Long.valueOf((Integer) JsonPath.read(res, "$.id"));
+        createdPostIds.add(postId);
+
+        // authorで一覧取得→自分の投稿だけ返る
+        mockMvc.perform(get("/api/admin/posts")
+                .header("Authorization", "Bearer " + authorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].authorId").value(authorId))
+                .andExpect(jsonPath("$.content.length()").value(1));
+    }
+
+    // adminは全投稿を取得できる
+    @Test
+    void getPosts_should_return_all_posts_count() throws Exception {
+        String adminToken = getAccessToken("admin@example.com", "password123");
+
+        // DBから全件数を取得
+        long dbCount = postRepository.count();
+
+        // APIで全件取得（ページサイズを十分大きくする）
+        mockMvc.perform(get("/api/admin/posts")
+                .param("size", String.valueOf(dbCount > 0 ? dbCount : 100))
+                .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value((int) dbCount));
+    }
+
+    // Editorでも全投稿取得できる
+    @Test
+    void getPosts_byEditor_should_return_all_posts_count() throws Exception {
+        String editorToken = getAccessToken("editor@example.com", "password123");
+
+        // DBから全件数を取得
+        long dbCount = postRepository.count();
+
+        // APIで全件取得（ページサイズを十分大きくする）
+        mockMvc.perform(get("/api/admin/posts")
+                .param("size", String.valueOf(dbCount > 0 ? dbCount : 100))
+                .header("Authorization", "Bearer " + editorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value((int) dbCount));
+    }
+
+    // slug重複
+    @Test
+    void createPost_duplicateSlug_should_return_409() throws Exception {
+        String token = getAccessToken("author@example.com", "password123");
+        Long authorId = userRepository.findByEmail("author@example.com").orElseThrow().getId();
+        var req = PostRequestDto.builder()
+                .title("タイトル1")
+                .slug("dup-slug")
+                .status("DRAFT")
+                .contentJson("{\"ops\":[{\"insert\":\"本文\"}]}")
+                .authorId(authorId)
+                .excerpt("概要")
+                .build();
+        // 1回目は成功
+        var res = mockMvc.perform(post("/api/admin/posts")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long postId = Long.valueOf((Integer) JsonPath.read(res, "$.id"));
+        createdPostIds.add(postId);
+        // 2回目は409
+        mockMvc.perform(post("/api/admin/posts")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isConflict());
+    }
+
+    // ページングとソート
+    @Test
+    void getPosts_paging_and_sorting_should_return_correct_results() throws Exception {
+        String adminToken = getAccessToken("admin@example.com", "password123");
+        Long authorId = userRepository.findByEmail("author@example.com").orElseThrow().getId();
+
+        // 1. 既存の投稿数を取得
+        long initialCount = postRepository.count();
+
+        // 2. テストで投稿を3件作成
+        int created = 3;
+        for (int i = 1; i <= created; i++) {
+            var req = PostRequestDto.builder()
+                    .title("タイトル" + i)
+                    .slug("paging-slug-" + i)
+                    .status("DRAFT")
+                    .contentJson("{\"ops\":[{\"insert\":\"本文" + i + "\"}]}")
+                    .authorId(authorId)
+                    .excerpt("概要" + i)
+                    .build();
+            var res = mockMvc.perform(post("/api/admin/posts")
+                    .header("Authorization", "Bearer " + adminToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(req)))
+                    .andExpect(status().isCreated())
+                    .andReturn().getResponse().getContentAsString();
+            Long postId = Long.valueOf((Integer) JsonPath.read(res, "$.id"));
+            createdPostIds.add(postId);
+        }
+
+        // 3. 総件数
+        long total = initialCount + created;
+        int pageSize = 2;
+        int totalPages = (int) Math.ceil((double) total / pageSize);
+
+        // 4. 各ページの期待件数を計算
+        for (int page = 0; page < totalPages; page++) {
+            int expectedCount = (int) Math.min(pageSize, total - page * pageSize);
+            mockMvc.perform(get("/api/admin/posts")
+                    .param("page", String.valueOf(page))
+                    .param("size", String.valueOf(pageSize))
+                    .param("sort", "createdAt,desc")
+                    .header("Authorization", "Bearer " + adminToken))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content.length()").value(expectedCount));
+        }
+    }
+
+    // 投稿者自身による削除（正常系）
+    @Test
+    void deletePost_byOwner_should_return_204_and_not_found_after() throws Exception {
+        String authorToken = getAccessToken("author@example.com", "password123");
+        Long authorId = userRepository.findByEmail("author@example.com").orElseThrow().getId();
+
+        // 投稿作成
+        var req = PostRequestDto.builder()
+                .title("削除テスト")
+                .slug("delete-slug")
+                .status("DRAFT")
+                .contentJson("{\"ops\":[{\"insert\":\"削除本文\"}]}")
+                .authorId(authorId)
+                .excerpt("概要")
+                .build();
+        var res = mockMvc.perform(post("/api/admin/posts")
+                .header("Authorization", "Bearer " + authorToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long postId = Long.valueOf((Integer) JsonPath.read(res, "$.id"));
+
+        // 削除
+        mockMvc.perform(delete("/api/admin/posts/" + postId)
+                .header("Authorization", "Bearer " + authorToken))
+                .andExpect(status().isNoContent());
+
+        // 削除後の取得は404
+        mockMvc.perform(get("/api/admin/posts/" + postId)
+                .header("Authorization", "Bearer " + authorToken))
+                .andExpect(status().isNotFound());
+    }
+
+    // 存在しない投稿の削除は404
+    @Test
+    void deletePost_notFound_should_return_404() throws Exception {
+        String adminToken = getAccessToken("admin@example.com", "password123");
+        mockMvc.perform(delete("/api/admin/posts/999999")
+                .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    // 投稿者自身による更新（正常系）
+    @Test
+    void updatePost_byOwner_should_return_200_and_reflect_changes() throws Exception {
+        String authorToken = getAccessToken("author@example.com", "password123");
+        Long authorId = userRepository.findByEmail("author@example.com").orElseThrow().getId();
+
+        // 1. 投稿作成
+        var createReq = PostRequestDto.builder()
+                .title("更新前タイトル")
+                .slug("update-slug")
+                .status("DRAFT")
+                .contentJson("{\"ops\":[{\"insert\":\"更新前本文\"}]}")
+                .authorId(authorId)
+                .excerpt("更新前概要")
+                .build();
+        var createRes = mockMvc.perform(post("/api/admin/posts")
+                .header("Authorization", "Bearer " + authorToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createReq)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long postId = Long.valueOf((Integer) JsonPath.read(createRes, "$.id"));
+        createdPostIds.add(postId);
+
+        // 2. 更新リクエスト
+        var updateReq = PostRequestDto.builder()
+                .title("更新後タイトル")
+                .slug("update-slug") // slugは変えずに更新
+                .status("DRAFT")
+                .contentJson("{\"ops\":[{\"insert\":\"更新後本文\"}]}")
+                .authorId(authorId)
+                .excerpt("更新後概要")
+                .build();
+
+        mockMvc.perform(put("/api/admin/posts/" + postId)
+                .header("Authorization", "Bearer " + authorToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(postId))
+                .andExpect(jsonPath("$.title").value("更新後タイトル"))
+                .andExpect(jsonPath("$.excerpt").value("更新後概要"))
+                .andReturn().getResponse().getContentAsString();
+
+        // 3. DBの値も反映されているか確認
+        var updatedPost = postRepository.findById(postId).orElseThrow();
+        assert updatedPost.getTitle().equals("更新後タイトル");
+        assert updatedPost.getExcerpt().equals("更新後概要");
+    }
+
+    // ユーティリティ: ログインしてトークン取得
+    String getAccessToken(String email, String password) throws Exception {
+        var loginReq = new LoginRequestDto(email, password);
+        var loginRes = mockMvc.perform(post("/api/public/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return JsonPath.read(loginRes, "$.accessToken");
+    }
+
+    // author が PUBLISHED に更新しようとすると 403
+    @Test
+    void updatePost_statusToPublished_byAuthor_should_return_403() throws Exception {
+        String authorToken = getAccessToken("author@example.com", "password123");
+        Long authorId = userRepository.findByEmail("author@example.com").orElseThrow().getId();
+
+        // 1. DRAFT 状態で投稿作成
+        var createReq = PostRequestDto.builder()
+                .title("公開権限テスト")
+                .slug("publish-slug")
+                .status("DRAFT")
+                .contentJson("{\"ops\":[{\"insert\":\"本文\"}]}")
+                .authorId(authorId)
+                .excerpt("概要")
+                .build();
+        var createRes = mockMvc.perform(post("/api/admin/posts")
+                .header("Authorization", "Bearer " + authorToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createReq)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long postId = Long.valueOf((Integer) JsonPath.read(createRes, "$.id"));
+        createdPostIds.add(postId);
+
+        // 2. author が PUBLISHED にしようとする → 403
+        var updateReq = PostRequestDto.builder()
+                .title("公開権限テスト")
+                .slug("publish-slug")
+                .status("PUBLISHED")
+                .contentJson("{\"ops\":[{\"insert\":\"本文更新\"}]}")
+                .authorId(authorId)
+                .excerpt("概要更新")
+                .build();
+
+        mockMvc.perform(put("/api/admin/posts/" + postId)
+                .header("Authorization", "Bearer " + authorToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateReq)))
+                .andExpect(status().isForbidden());
+    }
+
+    // editor が DRAFT → PUBLISHED に更新できる（正常系）
+    @Test
+    void updatePost_statusToPublished_byEditor_should_return_200_and_set_publishedAt() throws Exception {
+        String editorToken = getAccessToken("editor@example.com", "password123");
+        Long editorId = userRepository.findByEmail("editor@example.com").orElseThrow().getId();
+
+        // 1. DRAFT 状態で投稿作成
+        var createReq = PostRequestDto.builder()
+                .title("公開テスト")
+                .slug("publish-slug-editor")
+                .status("DRAFT")
+                .contentJson("{\"ops\":[{\"insert\":\"本文\"}]}")
+                .authorId(editorId)
+                .excerpt("概要")
+                .build();
+        var createRes = mockMvc.perform(post("/api/admin/posts")
+                .header("Authorization", "Bearer " + editorToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createReq)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long postId = Long.valueOf((Integer) JsonPath.read(createRes, "$.id"));
+        createdPostIds.add(postId);
+
+        // 2. PUBLISHED に更新
+        var updateReq = PostRequestDto.builder()
+                .title("公開テスト更新")
+                .slug("publish-slug-editor")
+                .status("PUBLISHED")
+                .contentJson("{\"ops\":[{\"insert\":\"公開本文\"}]}")
+                .authorId(editorId)
+                .excerpt("公開概要")
+                .build();
+
+        mockMvc.perform(put("/api/admin/posts/" + postId)
+                .header("Authorization", "Bearer " + editorToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PUBLISHED"))
+                .andExpect(jsonPath("$.publishedAt").exists())
+                .andReturn().getResponse().getContentAsString();
+
+        // 3. DBの値も反映されているか確認
+        var updatedPost = postRepository.findById(postId).orElseThrow();
+        assert updatedPost.getStatus() == Post.Status.PUBLISHED;
+        assert updatedPost.getPublishedAt() != null;
+    }
+
+    // admin が DRAFT → PUBLISHED に更新できる（正常系）
+    @Test
+    void updatePost_statusToPublished_byAdmin_should_return_200_and_set_publishedAt() throws Exception {
+        String adminToken = getAccessToken("admin@example.com", "password123");
+        Long adminId = userRepository.findByEmail("admin@example.com").orElseThrow().getId();
+        // 1. DRAFT 状態で投稿作成
+        var createReq = PostRequestDto.builder()
+                .title("公開テストadmin")
+                .slug("publish-slug-admin")
+                .status("DRAFT")
+                .contentJson("{\"ops\":[{\"insert\":\"本文\"}]}")
+                .authorId(adminId)
+                .excerpt("概要")
+                .build();
+        var createRes = mockMvc.perform(post("/api/admin/posts")
+                .header("Authorization", "Bearer " + adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createReq)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long postId = Long.valueOf((Integer) JsonPath.read(createRes, "$.id"));
+        createdPostIds.add(postId);
+
+        // 2. PUBLISHED に更新
+        var updateReq = PostRequestDto.builder()
+                .title("公開テスト更新admin")
+                .slug("publish-slug-admin")
+                .status("PUBLISHED")
+                .contentJson("{\"ops\":[{\"insert\":\"公開本文\"}]}")
+                .authorId(adminId)
+                .excerpt("公開概要")
+                .build();
+        mockMvc.perform(put("/api/admin/posts/" + postId)
+                .header("Authorization", "Bearer " + adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PUBLISHED"))
+                .andExpect(jsonPath("$.publishedAt").exists())
+                .andReturn().getResponse().getContentAsString();
+
+        // 3. DBの値も反映されているか確認
+        var updatedPost = postRepository.findById(postId).orElseThrow();
+        assert updatedPost.getStatus() == Post.Status.PUBLISHED;
+        assert updatedPost.getPublishedAt() != null;
+    }
+}

@@ -37,7 +37,8 @@ public class PostService {
     // 全件取得
     @Transactional(readOnly = true)
     public Page<PostResponseDto> findAll(Pageable pageable) {
-        return postRepository.findAll(pageable).map(postMapper::toResponseDto);
+        return postRepository.findAll(pageable)
+                .map(post -> postMapper.toResponseDto(post, false));
     }
 
     // 検索
@@ -81,22 +82,8 @@ public class PostService {
     // 投稿を1件をIDで取得し、アクセス権をチェック（管理者権限で実行）
     @Transactional(readOnly = true)
     public Optional<PostResponseDto> findById(Long id) {
-        return findById(id, 1L, User.Role.ADMIN);
-    }
-
-    // 投稿を1件をスラッグで取得し、アクセス権をチェック
-    @Transactional(readOnly = true)
-    public Optional<PostResponseDto> findBySlug(String slug, Long currentUserId, User.Role userRole) {
-        return postRepository.findBySlug(slug).map(post -> {
-            checkAccessOrThrow(post, currentUserId, userRole);
-            return postMapper.toResponseDto(post);
-        });
-    }
-
-    // 投稿を1件をスラッグで取得し、アクセス権をチェック（管理者権限で実行）
-    @Transactional(readOnly = true)
-    public Optional<PostResponseDto> findBySlug(String slug) {
-        return findBySlug(slug, 1L, User.Role.ADMIN);
+        return postRepository.findById(id)
+                .map(post -> postMapper.toResponseDto(post, true));
     }
 
     // 投稿を作成

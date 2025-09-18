@@ -221,7 +221,7 @@ class PostControllerTest {
         mockMvc.perform(get("/api/admin/posts")
                 .header("Authorization", "Bearer " + authorToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].authorId").value(authorId))
+                .andExpect(jsonPath("$.content[0].author.id").value(authorId))
                 .andExpect(jsonPath("$.content.length()").value(1));
     }
 

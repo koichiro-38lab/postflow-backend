@@ -4,12 +4,16 @@ import com.example.backend.entity.Category;
 import com.example.backend.entity.Media;
 import com.example.backend.entity.Post;
 import com.example.backend.entity.User;
+import com.example.backend.entity.Tag;
 import com.example.backend.repository.CategoryRepository;
 import com.example.backend.repository.MediaRepository;
 import com.example.backend.repository.UserRepository;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -21,20 +25,48 @@ public class PostMapper {
     private final CategoryRepository categoryRepository;
 
     public PostResponseDto toResponseDto(Post post) {
-        return PostResponseDto.builder()
+        return toResponseDto(post, true);
+    }
+
+    public PostResponseDto toResponseDto(Post post, boolean includeContentJson) {
+        PostResponseDto.PostResponseDtoBuilder builder = PostResponseDto.builder()
                 .id(post.getId())
                 .title(post.getTitle())
                 .slug(post.getSlug())
                 .status(post.getStatus().name())
-                .excerpt(post.getExcerpt())
-                .contentJson(post.getContentJson())
-                .coverMediaId(post.getCoverMedia() != null ? post.getCoverMedia().getId() : null)
-                .authorId(post.getAuthor() != null ? post.getAuthor().getId() : null)
-                .categoryId(post.getCategory() != null ? post.getCategory().getId() : null)
+                .excerpt(post.getExcerpt());
+        if (includeContentJson) {
+            builder.contentJson(post.getContentJson());
+        }
+        builder.coverMedia(post.getCoverMedia() != null ? CoverMediaSummaryDto.builder()
+                .id(post.getCoverMedia().getId())
+                .filename(post.getCoverMedia().getFilename())
+                .width(post.getCoverMedia().getWidth())
+                .height(post.getCoverMedia().getHeight())
+                .altText(post.getCoverMedia().getAltText())
+                .build() : null)
+                .author(post.getAuthor() != null ? AuthorSummaryDto.builder()
+                        .id(post.getAuthor().getId())
+                        // .name(post.getAuthor().getName())
+                        .build() : null)
+                .category(post.getCategory() != null ? CategorySummaryDto.builder()
+                        .id(post.getCategory().getId())
+                        .name(post.getCategory().getName())
+                        .slug(post.getCategory().getSlug())
+                        .build() : null)
+                .tags(post.getTags() != null
+                        ? post.getTags().stream()
+                                .map((Tag tag) -> TagSummaryDto.builder()
+                                        .id(tag.getId())
+                                        .name(tag.getName())
+                                        .slug(tag.getSlug())
+                                        .build())
+                                .toList()
+                        : List.of())
                 .publishedAt(post.getPublishedAt())
                 .createdAt(post.getCreatedAt())
-                .updatedAt(post.getUpdatedAt())
-                .build();
+                .updatedAt(post.getUpdatedAt());
+        return builder.build();
     }
 
     // Mutates the given entity from request DTO (create/update)

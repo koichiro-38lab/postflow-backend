@@ -8,6 +8,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "posts")
@@ -51,6 +52,14 @@ public class Post {
 
     @Column(name = "published_at")
     private LocalDateTime publishedAt;
+
+    @ManyToMany
+    @JoinTable(name = "post_tags", joinColumns = @JoinColumn(name = "post_id"), inverseJoinColumns = @JoinColumn(name = "tag_id"))
+    private List<Tag> tags;
+
+    public List<Tag> getTags() {
+        return tags;
+    }
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

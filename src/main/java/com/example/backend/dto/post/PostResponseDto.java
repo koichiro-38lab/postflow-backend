@@ -15,11 +15,11 @@ public class PostResponseDto {
     private String status;
     private String excerpt;
     private String contentJson;
-    private Long coverMediaId;
-    private Long authorId;
-    private Long categoryId;
+    private CoverMediaSummaryDto coverMedia;
+    private AuthorSummaryDto author;
+    private CategorySummaryDto category;
+    private List<TagSummaryDto> tags;
     private LocalDateTime publishedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    private List<Long> tagIds;
 }

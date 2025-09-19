@@ -1,0 +1,40 @@
+### adminユーザーでログイン
+# @name adminLogin
+POST http://localhost:8100/api/public/auth/login
+Content-Type: application/json
+
+{
+    "email": "admin@example.com",
+    "password": "password123"
+}
+
+### ADMINユーザーのアクセストークンを変数にセット
+@admin_token = {{adminLogin.response.body.accessToken}}
+
+### 投稿一覧取得（ADMINユーザー）- 全ての投稿が表示される
+GET http://localhost:8100/api/admin/posts
+Authorization: Bearer {{admin_token}}
+
+### 新規投稿作成（ADMINユーザー）- 誰の投稿でも作成可能
+POST http://localhost:8100/api/admin/posts
+Content-Type: application/json
+Authorization: Bearer {{admin_token}}
+
+{
+    "title": "ADMINによる新規投稿テスト",
+    "slug": "admin-test-post-800",
+    "status": "DRAFT",
+    "excerpt": "ADMINがテストで作成した投稿",
+    "contentJson": "{\"blocks\":[{\"type\":\"paragraph\",\"data\":{\"text\":\"ADMINユーザーのテスト投稿本文\"}}]}",
+    "authorId": 1, 
+    "categoryId": null,
+    "tagIds": []
+}
+
+### 特定の投稿を取得（ADMINユーザー）- どの投稿でも取得可能
+GET http://localhost:8100/api/admin/posts/1
+Authorization: Bearer {{admin_token}}
+
+### 投稿の削除（ADMINユーザー）- どの投稿でも削除可能
+DELETE http://localhost:8100/api/admin/posts/115
+Authorization: Bearer {{admin_token}}

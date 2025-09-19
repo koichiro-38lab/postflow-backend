@@ -1,0 +1,57 @@
+### editorユーザーでログイン
+# @name editorLogin
+POST http://localhost:8100/api/public/auth/login
+Content-Type: application/json
+
+{
+    "email": "editor@example.com",
+    "password": "password123"
+}
+
+### EDITORユーザーのアクセストークンを変数にセット
+@editor_token = {{editorLogin.response.body.accessToken}}
+
+### 投稿一覧取得（EDITORユーザー）- 自分の投稿のみ表示される
+GET http://localhost:8100/api/admin/posts
+Authorization: Bearer {{editor_token}}
+
+### 新規投稿作成（EDITORユーザー）- 自分の投稿のみ作成可能
+POST http://localhost:8100/api/admin/posts
+Content-Type: application/json
+Authorization: Bearer {{editor_token}}
+
+{
+    "title": "EDITORによる新規投稿テスト",
+    "slug": "editor-test-post",
+    "status": "DRAFT",
+    "excerpt": "EDITORがテストで作成した投稿",
+    "contentJson": "{\"blocks\":[{\"type\":\"paragraph\",\"data\":{\"text\":\"EDITORユーザーのテスト投稿本文\"}}]}",
+    "authorId": 2, 
+    "categoryId": null,
+    "tagIds": []
+}
+
+### 特定の投稿を取得（EDITORユーザー）- 全ての投稿がアクセス可能
+GET http://localhost:8100/api/admin/posts/2
+Authorization: Bearer {{editor_token}}
+
+### 投稿の更新（EDITORユーザー）- 全ての投稿が更新可能
+PUT http://localhost:8100/api/admin/posts/2
+Content-Type: application/json
+Authorization: Bearer {{editor_token}}
+
+{
+    "title": "EDITORによる更新テスト1111111",
+    "slug": "editor-update-test",
+    "status": "DRAFT",
+    "excerpt": "EDITORがテストで更新した投稿",
+    "contentJson": "{\"blocks\":[{\"type\":\"paragraph\",\"data\":{\"text\":\"EDITORユーザーによる更新本文\"}}]}",
+    "authorId": 2, 
+    "categoryId": null,
+    "tagIds": []
+}
+
+### 投稿の削除（EDITORユーザー）- 自分の投稿のみ削除可能
+# 注：この投稿がeditorユーザーのものでなければ403エラーになります
+DELETE http://localhost:8100/api/admin/posts/
+Authorization: Bearer {{editor_token}}

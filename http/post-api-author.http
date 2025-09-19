@@ -1,0 +1,37 @@
+### authorユーザーでログイン
+# @name authorLogin
+POST http://localhost:8100/api/public/auth/login
+Content-Type: application/json
+
+{
+    "email": "author@example.com",
+    "password": "password123"
+}
+
+### AUTHORユーザーのアクセストークンを変数にセット
+@author_token = {{authorLogin.response.body.accessToken}}
+
+### 投稿一覧取得（AUTHORユーザー）- 自分の投稿のみ表示される
+GET http://localhost:8100/api/admin/posts
+Authorization: Bearer {{author_token}}
+
+### 新規投稿作成（AUTHORユーザー）- 自分の投稿のみ作成可能
+POST http://localhost:8100/api/admin/posts
+Content-Type: application/json
+Authorization: Bearer {{author_token}}
+
+{
+    "title": "AUTHORによる新規投稿テスト",
+    "slug": "author-test-post-800",
+    "status": "DRAFT",
+    "excerpt": "AUTHORがテストで作成した投稿",
+    "contentJson": "{\"blocks\":[{\"type\":\"paragraph\",\"data\":{\"text\":\"AUTHORユーザーのテスト投稿本文\"}}]}",
+    "authorId": 3, 
+    "categoryId": null,
+    "tagIds": []
+}
+
+### 特定の投稿を取得（AUTHORユーザー）- 自分の投稿のみアクセス可能
+# 注：この投稿がauthorユーザーのものでなければ403エラーになります
+GET http://localhost:8100/api/admin/posts/2
+Authorization: Bearer {{author_token}}

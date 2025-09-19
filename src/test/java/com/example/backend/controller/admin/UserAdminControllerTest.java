@@ -53,7 +53,7 @@ class UserAdminControllerTest {
     @Test
     void createUser_blankEmail_should_return_400() throws Exception {
         var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/public/auth/login")
+        var loginRes = mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginReq)))
                 .andExpect(status().isOk())
@@ -74,7 +74,7 @@ class UserAdminControllerTest {
     @Test
     void createUser_invalidEmailFormat_should_return_400() throws Exception {
         var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/public/auth/login")
+        var loginRes = mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginReq)))
                 .andExpect(status().isOk())
@@ -95,7 +95,7 @@ class UserAdminControllerTest {
     @Test
     void createUser_duplicateEmail_should_return_409() throws Exception {
         var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/public/auth/login")
+        var loginRes = mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginReq)))
                 .andExpect(status().isOk())
@@ -116,7 +116,7 @@ class UserAdminControllerTest {
     @Test
     void createUser_shortEmail_should_return_400() throws Exception {
         var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/public/auth/login")
+        var loginRes = mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginReq)))
                 .andExpect(status().isOk())
@@ -137,7 +137,7 @@ class UserAdminControllerTest {
     @Test
     void createUser_sqlInjectionInEmail_should_return_400() throws Exception {
         var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/public/auth/login")
+        var loginRes = mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginReq)))
                 .andExpect(status().isOk())
@@ -158,7 +158,7 @@ class UserAdminControllerTest {
     @Test
     void createUser_xssInEmail_should_return_400() throws Exception {
         var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/public/auth/login")
+        var loginRes = mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginReq)))
                 .andExpect(status().isOk())
@@ -179,7 +179,7 @@ class UserAdminControllerTest {
     @Test
     void createUser_invalidRole_should_return_400() throws Exception {
         var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/public/auth/login")
+        var loginRes = mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginReq)))
                 .andExpect(status().isOk())
@@ -201,7 +201,7 @@ class UserAdminControllerTest {
     @Test
     void admin_users_should_return_200_after_login() throws Exception {
         var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/public/auth/login")
+        var loginRes = mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginReq)))
                 .andExpect(status().isOk())
@@ -217,7 +217,7 @@ class UserAdminControllerTest {
     @Test
     void admin_users_should_return_403_forbidden_for_non_admin_user() throws Exception {
         var loginReq = new LoginRequestDto("author@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/public/auth/login")
+        var loginRes = mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginReq)))
                 .andExpect(status().isOk())
@@ -234,7 +234,7 @@ class UserAdminControllerTest {
     @Test
     void updateUser_notFound_should_return_404() throws Exception {
         var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/public/auth/login")
+        var loginRes = mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginReq)))
                 .andExpect(status().isOk())
@@ -254,7 +254,7 @@ class UserAdminControllerTest {
     @Test
     void createUser_success_should_return_201() throws Exception {
         var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/public/auth/login")
+        var loginRes = mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginReq)))
                 .andExpect(status().isOk())
@@ -279,7 +279,7 @@ class UserAdminControllerTest {
     @Test
     void updateUser_success_should_return_200() throws Exception {
         var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/public/auth/login")
+        var loginRes = mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginReq)))
                 .andExpect(status().isOk())
@@ -314,7 +314,7 @@ class UserAdminControllerTest {
     @Test
     void deleteUser_success_should_return_204() throws Exception {
         var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/public/auth/login")
+        var loginRes = mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginReq)))
                 .andExpect(status().isOk())

@@ -1,6 +1,6 @@
 ### editorユーザーでログイン
 # @name editorLogin
-POST http://localhost:8100/api/public/auth/login
+POST http://localhost:8100/api/auth/login
 Content-Type: application/json
 
 {

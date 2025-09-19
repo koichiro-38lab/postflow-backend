@@ -492,7 +492,7 @@ class PostControllerTest {
     // ユーティリティ: ログインしてトークン取得
     String getAccessToken(String email, String password) throws Exception {
         var loginReq = new LoginRequestDto(email, password);
-        var loginRes = mockMvc.perform(post("/api/public/auth/login")
+        var loginRes = mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginReq)))
                 .andExpect(status().isOk())

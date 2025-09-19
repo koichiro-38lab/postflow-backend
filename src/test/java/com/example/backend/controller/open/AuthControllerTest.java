@@ -57,7 +57,7 @@ class AuthControllerTest {
     @Test
     void login_success() throws Exception {
         var req = new LoginRequestDto("admin@example.com", "password123");
-        mockMvc.perform(post("/api/public/auth/login")
+        mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isOk())
@@ -69,7 +69,7 @@ class AuthControllerTest {
     @Test
     void login_invalidPassword() throws Exception {
         var req = new LoginRequestDto("admin@example.com", "wrongpass");
-        mockMvc.perform(post("/api/public/auth/login")
+        mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isUnauthorized())
@@ -80,7 +80,7 @@ class AuthControllerTest {
     @Test
     void refresh_invalidToken() throws Exception {
         var req = new RefreshRequestDto("invalidtoken");
-        mockMvc.perform(post("/api/public/auth/refresh")
+        mockMvc.perform(post("/api/auth/refresh")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isUnauthorized())
@@ -92,7 +92,7 @@ class AuthControllerTest {
     void refresh_token_rotation() throws Exception {
         // ログインして取得
         var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/public/auth/login")
+        var loginRes = mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginReq)))
                 .andExpect(status().isOk())
@@ -103,7 +103,7 @@ class AuthControllerTest {
 
         // 旧トークンでリフレッシュ
         var refreshReq = new RefreshRequestDto(oldRefreshToken);
-        var refreshRes = mockMvc.perform(post("/api/public/auth/refresh")
+        var refreshRes = mockMvc.perform(post("/api/auth/refresh")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(refreshReq)))
                 .andExpect(status().isOk())
@@ -115,7 +115,7 @@ class AuthControllerTest {
         setTestClockSecondsOffset(2);
 
         // 旧トークン再使用は失敗
-        mockMvc.perform(post("/api/public/auth/refresh")
+        mockMvc.perform(post("/api/auth/refresh")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(refreshReq)))
                 .andExpect(status().isUnauthorized())
@@ -125,7 +125,7 @@ class AuthControllerTest {
 
         // 新トークンで成功
         var newRefreshReq = new RefreshRequestDto(newRefreshToken);
-        mockMvc.perform(post("/api/public/auth/refresh")
+        mockMvc.perform(post("/api/auth/refresh")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(newRefreshReq)))
                 .andExpect(status().isOk())
@@ -137,7 +137,7 @@ class AuthControllerTest {
     void refreshToken_expiration() throws Exception {
         // ログインしてリフレッシュトークン取得
         var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/public/auth/login")
+        var loginRes = mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginReq)))
                 .andExpect(status().isOk())
@@ -149,7 +149,7 @@ class AuthControllerTest {
 
         // 期限切れで401
         var refreshReq = new RefreshRequestDto(refreshToken);
-        mockMvc.perform(post("/api/public/auth/refresh")
+        mockMvc.perform(post("/api/auth/refresh")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(refreshReq)))
                 .andExpect(status().isUnauthorized())
@@ -160,7 +160,7 @@ class AuthControllerTest {
     @Test
     void refreshToken_reuse_should_fail() throws Exception {
         var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/public/auth/login")
+        var loginRes = mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginReq)))
                 .andExpect(status().isOk())
@@ -171,13 +171,13 @@ class AuthControllerTest {
 
         // 1回目成功
         var refreshReq = new RefreshRequestDto(refreshToken);
-        mockMvc.perform(post("/api/public/auth/refresh")
+        mockMvc.perform(post("/api/auth/refresh")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(refreshReq)))
                 .andExpect(status().isOk());
 
         // 2回目失敗
-        mockMvc.perform(post("/api/public/auth/refresh")
+        mockMvc.perform(post("/api/auth/refresh")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(refreshReq)))
                 .andExpect(status().isUnauthorized());

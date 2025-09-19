@@ -66,6 +66,9 @@ public class PostController {
     public ResponseEntity<PostResponseDto> create(
             @RequestBody @Valid PostRequestDto dto,
             @AuthenticationPrincipal Jwt jwt) {
+        if (jwt == null) {
+            return ResponseEntity.status(401).build();
+        }
         String role = jwt.getClaimAsStringList("roles").get(0);
         Long userId = getUserIdFromJwt(jwt);
 

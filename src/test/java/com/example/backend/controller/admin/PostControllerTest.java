@@ -201,8 +201,8 @@ class PostControllerTest {
         Long authorId = userRepository.findByEmail("author@example.com").orElseThrow().getId();
 
         var req = PostRequestDto.builder()
-                .title("editor投稿")
-                .slug("editor-post")
+                .title("author投稿")
+                .slug("author-post-check-own")
                 .status("DRAFT")
                 .contentJson("{\"ops\":[{\"insert\":\"本文\"}]}")
                 .authorId(authorId)
@@ -217,12 +217,73 @@ class PostControllerTest {
         Long postId = Long.valueOf((Integer) JsonPath.read(res, "$.id"));
         createdPostIds.add(postId);
 
-        // authorで一覧取得→自分の投稿だけ返る
-        mockMvc.perform(get("/api/admin/posts")
+        // authorで一覧取得→全件のauthor.idが自分自身であることをassert
+        var listRes = mockMvc.perform(get("/api/admin/posts")
                 .header("Authorization", "Bearer " + authorToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].author.id").value(authorId))
-                .andExpect(jsonPath("$.content.length()").value(1));
+                .andReturn().getResponse().getContentAsString();
+        List<Integer> authorIds = JsonPath.read(listRes, "$.content[*].author.id");
+        for (Integer id : authorIds) {
+            assert id.longValue() == authorId : "author以外の投稿が混入: id=" + id;
+        }
+        // 1件以上返ることも確認
+        assert authorIds.size() > 0 : "authorの投稿が1件も返らない";
+    }
+
+    // authorはadmin/editorの投稿取得は403になることをIDごとに検証
+    @Test
+    void getPost_byAuthor_for_admin_and_editor_posts_should_return_403() throws Exception {
+        String authorToken = getAccessToken("author@example.com", "password123");
+        String adminToken = getAccessToken("admin@example.com", "password123");
+        String editorToken = getAccessToken("editor@example.com", "password123");
+
+        // まずadminで投稿作成
+        Long adminId = userRepository.findByEmail("admin@example.com").orElseThrow().getId();
+        var adminReq = PostRequestDto.builder()
+                .title("admin投稿")
+                .slug("admin-post-for-auth-test")
+                .status("DRAFT")
+                .contentJson("{\"ops\":[{\"insert\":\"admin本文\"}]}")
+                .authorId(adminId)
+                .excerpt("admin概要")
+                .build();
+        var adminRes = mockMvc.perform(post("/api/admin/posts")
+                .header("Authorization", "Bearer " + adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(adminReq)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long adminPostId = Long.valueOf((Integer) JsonPath.read(adminRes, "$.id"));
+        createdPostIds.add(adminPostId);
+
+        // editorで投稿作成
+        Long editorId = userRepository.findByEmail("editor@example.com").orElseThrow().getId();
+        var editorReq = PostRequestDto.builder()
+                .title("editor投稿")
+                .slug("editor-post-for-auth-test")
+                .status("DRAFT")
+                .contentJson("{\"ops\":[{\"insert\":\"editor本文\"}]}")
+                .authorId(editorId)
+                .excerpt("editor概要")
+                .build();
+        var editorRes = mockMvc.perform(post("/api/admin/posts")
+                .header("Authorization", "Bearer " + editorToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(editorReq)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long editorPostId = Long.valueOf((Integer) JsonPath.read(editorRes, "$.id"));
+        createdPostIds.add(editorPostId);
+
+        // authorがadminの投稿を取得→403
+        mockMvc.perform(get("/api/admin/posts/" + adminPostId)
+                .header("Authorization", "Bearer " + authorToken))
+                .andExpect(status().isForbidden());
+
+        // authorがeditorの投稿を取得→403
+        mockMvc.perform(get("/api/admin/posts/" + editorPostId)
+                .header("Authorization", "Bearer " + authorToken))
+                .andExpect(status().isForbidden());
     }
 
     // adminは全投稿を取得できる

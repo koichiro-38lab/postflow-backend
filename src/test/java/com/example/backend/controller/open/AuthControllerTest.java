@@ -56,7 +56,7 @@ class AuthControllerTest {
     // ログイン成功
     @Test
     void login_success() throws Exception {
-        var req = new LoginRequestDto("test@example.com", "password123");
+        var req = new LoginRequestDto("admin@example.com", "password123");
         mockMvc.perform(post("/api/public/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
@@ -68,7 +68,7 @@ class AuthControllerTest {
     // ログイン失敗（パスワード間違い）
     @Test
     void login_invalidPassword() throws Exception {
-        var req = new LoginRequestDto("test@example.com", "wrongpass");
+        var req = new LoginRequestDto("admin@example.com", "wrongpass");
         mockMvc.perform(post("/api/public/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
@@ -91,7 +91,7 @@ class AuthControllerTest {
     @Test
     void refresh_token_rotation() throws Exception {
         // ログインして取得
-        var loginReq = new LoginRequestDto("test@example.com", "password123");
+        var loginReq = new LoginRequestDto("admin@example.com", "password123");
         var loginRes = mockMvc.perform(post("/api/public/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginReq)))
@@ -136,7 +136,7 @@ class AuthControllerTest {
     @Test
     void refreshToken_expiration() throws Exception {
         // ログインしてリフレッシュトークン取得
-        var loginReq = new LoginRequestDto("test@example.com", "password123");
+        var loginReq = new LoginRequestDto("admin@example.com", "password123");
         var loginRes = mockMvc.perform(post("/api/public/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginReq)))
@@ -159,7 +159,7 @@ class AuthControllerTest {
     // リフレッシュトークンの再利用は401
     @Test
     void refreshToken_reuse_should_fail() throws Exception {
-        var loginReq = new LoginRequestDto("test@example.com", "password123");
+        var loginReq = new LoginRequestDto("admin@example.com", "password123");
         var loginRes = mockMvc.perform(post("/api/public/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginReq)))

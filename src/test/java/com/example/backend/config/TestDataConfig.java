@@ -12,11 +12,19 @@ public class TestDataConfig {
     @Bean
     public org.springframework.boot.ApplicationRunner testDataRunner(UserRepository users, PasswordEncoder encoder) {
         return args -> {
-            users.findByEmail("test@example.com").orElseGet(() -> {
+            users.findByEmail("admin@example.com").orElseGet(() -> {
                 User u = User.builder()
-                        .email("test@example.com")
+                        .email("admin@example.com")
                         .passwordHash(encoder.encode("password123"))
                         .role(User.Role.ADMIN)
+                        .build();
+                return users.save(u);
+            });
+            users.findByEmail("editor@example.com").orElseGet(() -> {
+                User u = User.builder()
+                        .email("editor@example.com")
+                        .passwordHash(encoder.encode("password123"))
+                        .role(User.Role.EDITOR)
                         .build();
                 return users.save(u);
             });

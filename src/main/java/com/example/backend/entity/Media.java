@@ -20,7 +20,7 @@ public class Media {
     @Column(nullable = false, length = 255)
     private String filename;
 
-    @Column(nullable = false, length = 255)
+    @Column(nullable = false, length = 255, unique = true)
     private String storageKey;
 
     @Column(nullable = false, length = 100)

@@ -38,3 +38,29 @@ Authorization: Bearer {{admin_token}}
 ### 投稿の削除（ADMINユーザー）- どの投稿でも削除可能
 DELETE http://localhost:8100/api/admin/posts/115
 Authorization: Bearer {{admin_token}}
+
+### メディアプリサインURL発行
+# @name getPresignUrl
+POST http://localhost:8100/api/admin/media/presign
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+    "filename": "sample.jpg",
+    "mime": "image/jpeg",
+    "bytes": 1105727
+}
+
+### レスポンスからアップロードURLを変数にセット
+@uploadUrl = {{getPresignUrl.response.body.uploadUrl}}
+
+### 取得したアップロードURLに対してPUTリクエストでファイルをアップロード
+curl -X PUT "http://localhost/mock-upload/media/2025/09/06e5f7e4-3a60-48c1-8f57-c7efcd4bd89d.jpg" \
+    -H "Content-Type: image/jpeg" \
+    --data-binary "@./backend/http/images/sample.jpg"
+
+### メディア一覧取得（ADMINユーザー）
+# @name getMediaList
+
+GET http://localhost:8100/api/admin/media
+Authorization: Bearer {{admin_token}}

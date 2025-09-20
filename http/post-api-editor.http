@@ -55,3 +55,9 @@ Authorization: Bearer {{editor_token}}
 # 注：この投稿がeditorユーザーのものでなければ403エラーになります
 DELETE http://localhost:8100/api/admin/posts/
 Authorization: Bearer {{editor_token}}
+
+### メディア一覧取得（EDITORユーザー）
+# @name getMediaList
+
+GET http://localhost:8100/api/admin/media
+Authorization: Bearer {{editor_token}}

@@ -35,3 +35,9 @@ Authorization: Bearer {{author_token}}
 # 注：この投稿がauthorユーザーのものでなければ403エラーになります
 GET http://localhost:8100/api/admin/posts/2
 Authorization: Bearer {{author_token}}
+
+### メディア一覧取得（AUTHORユーザー）
+# @name getMediaList
+
+GET http://localhost:8100/api/admin/media
+Authorization: Bearer {{author_token}}

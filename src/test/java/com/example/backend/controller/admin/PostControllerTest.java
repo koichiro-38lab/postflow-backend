@@ -37,13 +37,58 @@ class PostControllerTest {
     PostRepository postRepository;
     @Autowired
     UserRepository userRepository;
+    @Autowired
+    com.example.backend.repository.MediaRepository mediaRepository;
 
     private List<Long> createdPostIds = new ArrayList<>();
+    private List<Long> createdMediaIds = new ArrayList<>();
 
     @AfterEach
     void tearDown() {
         createdPostIds.forEach(postRepository::deleteById);
         createdPostIds.clear();
+        createdMediaIds.forEach(mediaRepository::deleteById);
+        createdMediaIds.clear();
+    }
+
+    @Test
+    void createPost_withCoverMedia_shouldReturnCoverInfo() throws Exception {
+        String editorToken = getAccessToken("editor@example.com", "password123");
+        var editor = userRepository.findByEmail("editor@example.com").orElseThrow();
+
+        var media = mediaRepository.save(com.example.backend.entity.Media.builder()
+                .filename("cover-image.png")
+                .storageKey("media/test/" + java.util.UUID.randomUUID())
+                .mime("image/png")
+                .bytes(2048L)
+                .width(800)
+                .height(600)
+                .altText("Cover")
+                .createdBy(editor)
+                .build());
+        createdMediaIds.add(media.getId());
+
+        var req = PostRequestDto.builder()
+                .title("Cover Post")
+                .slug("cover-post-slug")
+                .status("DRAFT")
+                .contentJson("{\"ops\":[{\"insert\":\"body\"}]}")
+                .authorId(editor.getId())
+                .coverMediaId(media.getId())
+                .build();
+
+        String res = mockMvc.perform(post("/api/admin/posts")
+                .header("Authorization", "Bearer " + editorToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.coverMedia.id").value(media.getId()))
+                .andExpect(jsonPath("$.coverMedia.mime").value("image/png"))
+                .andExpect(jsonPath("$.coverMedia.bytes").value(2048))
+                .andReturn().getResponse().getContentAsString();
+
+        Long postId = Long.valueOf((Integer) JsonPath.read(res, "$.id"));
+        createdPostIds.add(postId);
     }
 
     // 投稿作成成功

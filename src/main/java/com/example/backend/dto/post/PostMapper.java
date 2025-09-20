@@ -41,6 +41,8 @@ public class PostMapper {
         builder.coverMedia(post.getCoverMedia() != null ? CoverMediaSummaryDto.builder()
                 .id(post.getCoverMedia().getId())
                 .filename(post.getCoverMedia().getFilename())
+                .mime(post.getCoverMedia().getMime())
+                .bytes(post.getCoverMedia().getBytes())
                 .width(post.getCoverMedia().getWidth())
                 .height(post.getCoverMedia().getHeight())
                 .altText(post.getCoverMedia().getAltText())

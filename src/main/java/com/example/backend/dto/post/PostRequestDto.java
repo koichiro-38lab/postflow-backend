@@ -30,6 +30,6 @@ public class PostRequestDto {
     @NotNull
     private Long authorId;
     private Long categoryId;
-    private List<Long> tagIds;
+    private List<String> tags;
     private String publishedAt;
 }

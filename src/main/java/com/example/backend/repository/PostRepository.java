@@ -12,4 +12,7 @@ public interface PostRepository extends JpaRepository<Post, Long>, JpaSpecificat
     Optional<Post> findBySlug(String slug);
 
     boolean existsByCoverMediaId(Long mediaId);
+
+    // 指定したタグIDを含む投稿が存在するか判定（タグ削除前チェック用）
+    boolean existsByTags_Id(Long tagId);
 }

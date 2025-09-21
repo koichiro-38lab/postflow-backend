@@ -4,6 +4,7 @@ import com.example.backend.dto.post.PostRequestDto;
 import com.example.backend.dto.post.PostResponseDto;
 import com.example.backend.dto.post.PostMapper;
 import com.example.backend.entity.Post;
+import com.example.backend.entity.Tag;
 import com.example.backend.entity.User;
 import com.example.backend.repository.PostRepository;
 import com.example.backend.security.PostPolicy;
@@ -16,8 +17,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.time.Clock;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +30,7 @@ public class PostService {
     private final PostRepository postRepository;
     private final PostMapper postMapper;
     private final PostPolicy postPolicy;
+    private final TagService tagService;
     private final Clock clock;
 
     // 投稿のアクセス権をチェックし、権限がなければ例外をスロー
@@ -44,7 +49,7 @@ public class PostService {
     // 検索
     @Transactional(readOnly = true)
     public Page<PostResponseDto> search(String title, String slug, String status, Long authorId, Long categoryId,
-            Pageable pageable) {
+            List<String> tagSlugs, Pageable pageable) {
         Specification<Post> spec = Specification.allOf();
 
         if (StringUtils.hasText(title)) {
@@ -65,6 +70,17 @@ public class PostService {
         }
         if (categoryId != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("category").get("id"), categoryId));
+        }
+        List<String> normalizedTagSlugs = tagSlugs != null
+                ? tagSlugs.stream().map(tagService::normalizeSlug).toList()
+                : List.of();
+        if (!normalizedTagSlugs.isEmpty()) {
+            spec = spec.and((root, query, cb) -> {
+                Objects.requireNonNull(query, "query must not be null");
+                query.distinct(true);
+                var tagsJoin = root.join("tags");
+                return tagsJoin.get("slug").in(normalizedTagSlugs);
+            });
         }
 
         return postRepository.findAll(spec, pageable).map(postMapper::toResponseDto);
@@ -92,6 +108,7 @@ public class PostService {
         postPolicy.checkCreate(userRole, dto.getAuthorId(), currentUserId);
         Post post = new Post();
         postMapper.applyToEntity(post, dto);
+        applyTags(post, dto.getTags());
         Post saved = postRepository.save(post);
         return postMapper.toResponseDto(saved);
     }
@@ -109,6 +126,7 @@ public class PostService {
             Long authorId = (post.getAuthor() != null) ? post.getAuthor().getId() : null;
             postPolicy.checkUpdate(userRole, authorId, dto.getAuthorId(), currentUserId, dto);
             postMapper.applyToEntity(post, dto);
+            applyTags(post, dto.getTags());
             if ("PUBLISHED".equals(dto.getStatus()) && post.getPublishedAt() == null) {
                 post.setPublishedAt(LocalDateTime.now(clock));
             }
@@ -135,5 +153,16 @@ public class PostService {
     @Transactional
     public void delete(Long id) {
         delete(id, 1L, User.Role.ADMIN);
+    }
+
+    private void applyTags(Post post, List<String> tagSlugs) {
+        if (tagSlugs == null) {
+            if (post.getTags() == null) {
+                post.setTags(new ArrayList<>());
+            }
+            return;
+        }
+        List<Tag> tags = tagService.findAllBySlugs(tagSlugs);
+        post.setTags(new ArrayList<>(tags));
     }
 }

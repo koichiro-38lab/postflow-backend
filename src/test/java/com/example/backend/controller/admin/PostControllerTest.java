@@ -5,6 +5,7 @@ import com.example.backend.config.TestDataConfig;
 import com.example.backend.dto.auth.LoginRequestDto;
 import com.example.backend.dto.post.PostRequestDto;
 import com.example.backend.entity.Post;
+import com.example.backend.entity.Tag;
 import com.example.backend.repository.PostRepository;
 import com.example.backend.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,9 +40,12 @@ class PostControllerTest {
     UserRepository userRepository;
     @Autowired
     com.example.backend.repository.MediaRepository mediaRepository;
+    @Autowired
+    com.example.backend.repository.TagRepository tagRepository;
 
     private List<Long> createdPostIds = new ArrayList<>();
     private List<Long> createdMediaIds = new ArrayList<>();
+    private List<Long> createdTagIds = new ArrayList<>();
 
     @AfterEach
     void tearDown() {
@@ -49,6 +53,8 @@ class PostControllerTest {
         createdPostIds.clear();
         createdMediaIds.forEach(mediaRepository::deleteById);
         createdMediaIds.clear();
+        createdTagIds.forEach(tagRepository::deleteById);
+        createdTagIds.clear();
     }
 
     @Test
@@ -89,6 +95,63 @@ class PostControllerTest {
 
         Long postId = Long.valueOf((Integer) JsonPath.read(res, "$.id"));
         createdPostIds.add(postId);
+    }
+
+    // 投稿にタグを付与して作成
+    @Test
+    void createPost_withTags_shouldReturnTags() throws Exception {
+        String editorToken = getAccessToken("editor@example.com", "password123");
+        var editor = userRepository.findByEmail("editor@example.com").orElseThrow();
+
+        Tag backend = tagRepository.save(Tag.builder().name("x-test-backend").slug("x-test-backend").build());
+        Tag spring = tagRepository.save(Tag.builder().name("x-test-spring").slug("x-test-spring").build());
+        createdTagIds.add(backend.getId());
+        createdTagIds.add(spring.getId());
+
+        var req = PostRequestDto.builder()
+                .title("Tagged Post")
+                .slug("tagged-post")
+                .status("DRAFT")
+                .contentJson("{\"ops\":[{\"insert\":\"body\"}]}")
+                .authorId(editor.getId())
+                .tags(List.of("x-test-backend", "x-test-spring"))
+                .build();
+
+        String res = mockMvc.perform(post("/api/admin/posts")
+                .header("Authorization", "Bearer " + editorToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        Long postId = Long.valueOf((Integer) JsonPath.read(res, "$.id"));
+        createdPostIds.add(postId);
+
+        List<String> tagSlugs = JsonPath.read(res, "$.tags[*].slug");
+        assert tagSlugs.contains("x-test-backend");
+        assert tagSlugs.contains("x-test-spring");
+    }
+
+    // 存在しないタグを指定して投稿作成失敗
+    @Test
+    void createPost_withUnknownTag_shouldReturn400() throws Exception {
+        String editorToken = getAccessToken("editor@example.com", "password123");
+        var editor = userRepository.findByEmail("editor@example.com").orElseThrow();
+
+        var req = PostRequestDto.builder()
+                .title("Invalid Tag Post")
+                .slug("invalid-tag-post")
+                .status("DRAFT")
+                .contentJson("{\"ops\":[{\"insert\":\"body\"}]}")
+                .authorId(editor.getId())
+                .tags(List.of("unknown"))
+                .build();
+
+        mockMvc.perform(post("/api/admin/posts")
+                .header("Authorization", "Bearer " + editorToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest());
     }
 
     // 投稿作成成功
@@ -361,6 +424,93 @@ class PostControllerTest {
                 .header("Authorization", "Bearer " + editorToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value((int) dbCount));
+    }
+
+    @Test
+    void searchPosts_byTagFilter_should_return_matching_posts() throws Exception {
+        String adminToken = getAccessToken("admin@example.com", "password123");
+        Long adminId = userRepository.findByEmail("admin@example.com").orElseThrow().getId();
+
+        Tag spring = tagRepository.save(Tag.builder().name("x-test-spring").slug("x-test-spring").build());
+        Tag security = tagRepository.save(Tag.builder().name("x-test-security").slug("x-test-security").build());
+        createdTagIds.add(spring.getId());
+        createdTagIds.add(security.getId());
+
+        var postSpring = PostRequestDto.builder()
+                .title("Spring Tips")
+                .slug("spring-tips")
+                .status("DRAFT")
+                .contentJson("{\"ops\":[{\"insert\":\"spring\"}]}")
+                .authorId(adminId)
+                .tags(List.of("x-test-spring"))
+                .build();
+        var postSecurity = PostRequestDto.builder()
+                .title("Security Guide")
+                .slug("security-guide")
+                .status("DRAFT")
+                .contentJson("{\"ops\":[{\"insert\":\"security\"}]}")
+                .authorId(adminId)
+                .tags(List.of("x-test-security"))
+                .build();
+        var postBoth = PostRequestDto.builder()
+                .title("Spring Security")
+                .slug("spring-security")
+                .status("DRAFT")
+                .contentJson("{\"ops\":[{\"insert\":\"spring security\"}]}")
+                .authorId(adminId)
+                .tags(List.of("x-test-spring", "x-test-security"))
+                .build();
+
+        String resSpring = mockMvc.perform(post("/api/admin/posts")
+                .header("Authorization", "Bearer " + adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(postSpring)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long postSpringId = Long.valueOf((Integer) JsonPath.read(resSpring, "$.id"));
+        createdPostIds.add(postSpringId);
+
+        String resSecurity = mockMvc.perform(post("/api/admin/posts")
+                .header("Authorization", "Bearer " + adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(postSecurity)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long postSecurityId = Long.valueOf((Integer) JsonPath.read(resSecurity, "$.id"));
+        createdPostIds.add(postSecurityId);
+
+        String resBoth = mockMvc.perform(post("/api/admin/posts")
+                .header("Authorization", "Bearer " + adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(postBoth)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long postBothId = Long.valueOf((Integer) JsonPath.read(resBoth, "$.id"));
+        createdPostIds.add(postBothId);
+
+        String listBySpring = mockMvc.perform(get("/api/admin/posts")
+                .param("tag", "x-test-spring")
+                .param("size", "10")
+                .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        List<String> springSlugs = JsonPath.read(listBySpring, "$.content[*].slug");
+        assert springSlugs.contains("spring-tips");
+        assert springSlugs.contains("spring-security");
+        assert !springSlugs.contains("security-guide");
+
+        String listByBoth = mockMvc.perform(get("/api/admin/posts")
+                .param("tag", "x-test-spring,x-test-security")
+                .param("size", "10")
+                .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        List<String> bothSlugs = JsonPath.read(listByBoth, "$.content[*].slug");
+        assert bothSlugs.contains("spring-tips");
+        assert bothSlugs.contains("spring-security");
+        assert bothSlugs.contains("security-guide");
     }
 
     // slug重複

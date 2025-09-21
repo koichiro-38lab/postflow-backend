@@ -64,3 +64,23 @@ curl -X PUT "http://localhost/mock-upload/media/2025/09/06e5f7e4-3a60-48c1-8f57-
 
 GET http://localhost:8100/api/admin/media
 Authorization: Bearer {{admin_token}}
+
+
+### タグ一覧取得（ADMINユーザー）
+GET http://localhost:8100/api/admin/tags
+Authorization: Bearer {{admin_token}}
+
+### タグを作成（ADMINユーザー）
+POST http://localhost:8100/api/admin/tags
+Content-Type: application/json
+Authorization: Bearer {{admin_token}}
+
+{
+    "name": "admin-test",
+    "slug": "admin-test"
+}
+
+### タグを削除（ADMINユーザー）
+# 注：このタグが投稿に紐づいている場合は削除できず、409エラーになります
+DELETE http://localhost:8100/api/admin/tags/1
+Authorization: Bearer {{admin_token}}

@@ -15,4 +15,7 @@ public interface PostRepository extends JpaRepository<Post, Long>, JpaSpecificat
 
     // 指定したタグIDを含む投稿が存在するか判定（タグ削除前チェック用）
     boolean existsByTags_Id(Long tagId);
+
+    // 指定したカテゴリIDを含む投稿が存在するか判定（カテゴリ削除前チェック用）
+    boolean existsByCategoryId(Long categoryId);
 }

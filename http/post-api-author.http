@@ -61,3 +61,40 @@ Authorization: Bearer {{author_token}}
 # 注：403エラーになります。
 DELETE http://localhost:8100/api/admin/tags/178
 Authorization: Bearer {{author_token}}
+
+### カテゴリ一覧取得（AUTHORユーザー）
+GET http://localhost:8100/api/admin/categories
+Authorization: Bearer {{author_token}}
+
+### カテゴリを作成（AUTHORユーザー）
+# 注：403エラーになります。
+POST http://localhost:8100/api/admin/categories
+Content-Type: application/json
+Authorization: Bearer {{author_token}}
+
+{
+    "name": "author-test-category",
+    "slug": "author-test-category",
+    "parentId": null
+}
+
+### 特定のIDのカテゴリを取得（AUTHORユーザー）
+GET http://localhost:8100/api/admin/categories/1
+Authorization: Bearer {{author_token}}
+
+### カテゴリを更新（AUTHORユーザー）
+# 注：403エラーになります。
+PUT http://localhost:8100/api/admin/categories/1
+Content-Type: application/json
+Authorization: Bearer {{author_token}}
+
+{
+    "name": "updated-author-category",
+    "slug": "updated-author-category",
+    "parentId": null
+}
+
+### カテゴリを削除（AUTHORユーザー）
+# 注：403エラーになります。
+DELETE http://localhost:8100/api/admin/categories/1
+Authorization: Bearer {{author_token}}

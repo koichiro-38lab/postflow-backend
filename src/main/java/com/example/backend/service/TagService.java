@@ -36,7 +36,7 @@ public class TagService {
 
     @Transactional
     public TagResponseDto create(TagRequestDto request, com.example.backend.entity.User.Role role) {
-        tagPolicy.checkCreate(role);
+        tagPolicy.checkCreate(role, null, null, null);
         String normalizedName = normalizeName(request.getName());
         String normalizedSlug = normalizeSlug(request.getSlug());
         Tag tag = Tag.builder()
@@ -49,7 +49,7 @@ public class TagService {
 
     @Transactional
     public TagResponseDto update(Long id, TagRequestDto request, com.example.backend.entity.User.Role role) {
-        tagPolicy.checkUpdate(role);
+        tagPolicy.checkUpdate(role, null, null, null);
         Tag tag = tagRepository.findById(id).orElseThrow(() -> new TagNotFoundException(id));
         String normalizedName = normalizeName(request.getName());
         String normalizedSlug = normalizeSlug(request.getSlug());
@@ -60,7 +60,7 @@ public class TagService {
 
     @Transactional
     public void delete(Long id, com.example.backend.entity.User.Role role) {
-        tagPolicy.checkDelete(role);
+        tagPolicy.checkDelete(role, null, null, null);
         Tag tag = tagRepository.findById(id).orElseThrow(() -> new TagNotFoundException(id));
         tagRepository.delete(tag);
     }

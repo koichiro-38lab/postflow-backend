@@ -1,3 +1,4 @@
+
 package com.example.backend.service;
 
 import com.example.backend.dto.user.UserMapper;
@@ -8,17 +9,26 @@ import com.example.backend.exception.UserNotFoundException;
 import com.example.backend.exception.DuplicateEmailException;
 import com.example.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Sort;
 import org.springframework.transaction.annotation.Transactional;
-
+import org.springframework.security.oauth2.jwt.Jwt;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class UserService {
+
+    // Jwtから認証ユーザーを取得（コントローラー共通化用）
+    public User getCurrentUser(Jwt jwt) {
+        if (jwt == null) {
+            throw new com.example.backend.exception.AccessDeniedException("Authentication required");
+        }
+        String email = jwt.getSubject();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new com.example.backend.exception.AccessDeniedException("Authentication required"));
+    }
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;

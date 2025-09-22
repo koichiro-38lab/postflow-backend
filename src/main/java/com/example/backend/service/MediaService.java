@@ -19,6 +19,7 @@ import com.example.backend.dto.media.MediaDownloadResponseDto;
 import com.example.backend.dto.media.MediaPresignRequestDto;
 import com.example.backend.dto.media.MediaPresignResponseDto;
 import com.example.backend.dto.media.MediaResponseDto;
+import com.example.backend.dto.media.MediaMapper;
 import com.example.backend.entity.Media;
 import com.example.backend.entity.User;
 import com.example.backend.exception.MediaInUseException;
@@ -42,10 +43,11 @@ public class MediaService {
     private final MediaStorage mediaStorage;
     private final MediaStorageProperties mediaProperties;
     private final Clock clock;
+    private final MediaMapper mediaMapper;
 
     @Transactional
     public MediaPresignResponseDto requestUpload(MediaPresignRequestDto dto, User currentUser) {
-        mediaPolicy.checkCreate(currentUser.getRole(), currentUser.getId(), currentUser.getId());
+        mediaPolicy.checkCreate(currentUser.getRole(), currentUser.getId(), null, currentUser.getId());
 
         String storageKey = generateUniqueStorageKey(dto.getFilename());
         Duration ttl = resolveTtl();
@@ -61,7 +63,7 @@ public class MediaService {
 
     @Transactional
     public MediaResponseDto register(MediaCreateRequestDto dto, User currentUser) {
-        mediaPolicy.checkCreate(currentUser.getRole(), currentUser.getId(), currentUser.getId());
+        mediaPolicy.checkCreate(currentUser.getRole(), currentUser.getId(), null, currentUser.getId());
 
         if (mediaRepository.existsByStorageKey(dto.getStorageKey())) {
             throw new MediaInUseException("error.media.storageKey.duplicate");
@@ -87,7 +89,7 @@ public class MediaService {
                 .build();
 
         Media saved = mediaRepository.save(media);
-        return toResponseDto(saved);
+        return mediaMapper.toResponseDto(saved, buildPublicUrl(saved));
     }
 
     @Transactional(readOnly = true)
@@ -106,20 +108,21 @@ public class MediaService {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("createdBy").get("id"), currentUser.getId()));
         }
 
-        return mediaRepository.findAll(spec, pageable).map(this::toResponseDto);
+        return mediaRepository.findAll(spec, pageable)
+                .map(media -> mediaMapper.toResponseDto(media, buildPublicUrl(media)));
     }
 
     @Transactional(readOnly = true)
     public MediaResponseDto getById(Long id, User currentUser) {
         Media media = mediaRepository.findById(id).orElseThrow(() -> new MediaNotFoundException(id));
-        mediaPolicy.checkRead(currentUser.getRole(), media.getCreatedBy().getId(), currentUser.getId());
-        return toResponseDto(media);
+        mediaPolicy.checkRead(currentUser.getRole(), media.getCreatedBy().getId(), null, currentUser.getId());
+        return mediaMapper.toResponseDto(media, buildPublicUrl(media));
     }
 
     @Transactional
     public MediaDownloadResponseDto createDownloadUrl(Long id, User currentUser) {
         Media media = mediaRepository.findById(id).orElseThrow(() -> new MediaNotFoundException(id));
-        mediaPolicy.checkRead(currentUser.getRole(), media.getCreatedBy().getId(), currentUser.getId());
+        mediaPolicy.checkRead(currentUser.getRole(), media.getCreatedBy().getId(), null, currentUser.getId());
 
         Duration ttl = resolveTtl();
         var presigned = mediaStorage.createDownloadUrl(media.getStorageKey(), ttl);
@@ -132,7 +135,7 @@ public class MediaService {
     @Transactional
     public void delete(Long id, User currentUser) {
         Media media = mediaRepository.findById(id).orElseThrow(() -> new MediaNotFoundException(id));
-        mediaPolicy.checkDelete(currentUser.getRole(), media.getCreatedBy().getId(), currentUser.getId());
+        mediaPolicy.checkDelete(currentUser.getRole(), media.getCreatedBy().getId(), null, currentUser.getId());
 
         if (postRepository.existsByCoverMediaId(media.getId())) {
             throw new MediaInUseException("error.media.inUse.cover");
@@ -195,27 +198,6 @@ public class MediaService {
             v = v.substring(0, v.length() - 1);
         }
         return v;
-    }
-
-    private MediaResponseDto toResponseDto(Media media) {
-        String publicUrl = buildPublicUrl(media);
-        return MediaResponseDto.builder()
-                .id(media.getId())
-                .filename(media.getFilename())
-                .storageKey(media.getStorageKey())
-                .mime(media.getMime())
-                .bytes(media.getBytes())
-                .width(media.getWidth())
-                .height(media.getHeight())
-                .altText(media.getAltText())
-                .publicUrl(publicUrl)
-                .createdAt(media.getCreatedAt())
-                .createdBy(MediaResponseDto.CreatedBySummary.builder()
-                        .id(media.getCreatedBy().getId())
-                        .email(media.getCreatedBy().getEmail())
-                        .role(media.getCreatedBy().getRole().name())
-                        .build())
-                .build();
     }
 
     private String buildPublicUrl(Media media) {

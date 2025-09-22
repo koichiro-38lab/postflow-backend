@@ -1,3 +1,4 @@
+
 package com.example.backend.service;
 
 import com.example.backend.dto.post.PostRequestDto;
@@ -15,13 +16,12 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.time.Clock;
-import java.util.Objects;
+import java.util.Arrays;
 
 @Service
 @RequiredArgsConstructor
@@ -33,25 +33,32 @@ public class PostService {
     private final TagService tagService;
     private final Clock clock;
 
-    // 投稿のアクセス権をチェックし、権限がなければ例外をスロー
-    public void checkAccessOrThrow(Post post, Long currentUserId, User.Role userRole) {
-        Long authorId = (post.getAuthor() != null) ? post.getAuthor().getId() : null;
-        postPolicy.checkRead(userRole, authorId, currentUserId);
+    // Controller用: RBAC・DTO変換まで一貫
+    @Transactional(readOnly = true)
+    public Optional<PostResponseDto> findByIdWithAccessControl(Long id, User user) {
+        Optional<Post> postOpt = postRepository.findById(id);
+        if (postOpt.isEmpty())
+            return Optional.empty();
+        Post post = postOpt.get();
+        if (!canAccess(post, user)) {
+            throw new com.example.backend.exception.AccessDeniedException("Access denied to this post");
+        }
+        return Optional.of(postMapper.toResponseDto(post));
     }
 
-    // 全件取得
     @Transactional(readOnly = true)
-    public Page<PostResponseDto> findAll(Pageable pageable) {
-        return postRepository.findAll(pageable)
-                .map(post -> postMapper.toResponseDto(post, false));
-    }
-
-    // 検索
-    @Transactional(readOnly = true)
-    public Page<PostResponseDto> search(String title, String slug, String status, Long authorId, Long categoryId,
-            List<String> tagSlugs, Pageable pageable) {
+    public Page<PostResponseDto> searchWithAccessControl(
+            String title, String slug, String status, Long authorId, Long categoryId, String tagParam,
+            Pageable pageable, User user) {
+        // タグパラメータの分割
+        List<String> tagSlugs = (tagParam != null && !tagParam.isBlank())
+                ? Arrays.stream(tagParam.split(","))
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .collect(java.util.stream.Collectors.toList())
+                : List.of();
+        // 検索条件
         Specification<Post> spec = Specification.allOf();
-
         if (StringUtils.hasText(title)) {
             spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.get("title")), "%" + title.toLowerCase() + "%"));
         }
@@ -63,7 +70,7 @@ public class PostService {
                 Post.Status postStatus = Post.Status.valueOf(status);
                 spec = spec.and((root, query, cb) -> cb.equal(root.get("status"), postStatus));
             } catch (IllegalArgumentException ignore) {
-                /* ignore invalid status */ }
+            }
         }
         if (authorId != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("author").get("id"), authorId));
@@ -71,41 +78,24 @@ public class PostService {
         if (categoryId != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("category").get("id"), categoryId));
         }
-        List<String> normalizedTagSlugs = tagSlugs != null
-                ? tagSlugs.stream().map(tagService::normalizeSlug).toList()
-                : List.of();
-        if (!normalizedTagSlugs.isEmpty()) {
+        if (!tagSlugs.isEmpty()) {
+            List<String> normalizedTagSlugs = tagSlugs.stream().map(tagService::normalizeSlug).toList();
             spec = spec.and((root, query, cb) -> {
-                Objects.requireNonNull(query, "query must not be null");
                 query.distinct(true);
                 var tagsJoin = root.join("tags");
                 return tagsJoin.get("slug").in(normalizedTagSlugs);
             });
         }
-
+        // ロールによる絞り込み
+        if (user.getRole() == User.Role.AUTHOR) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("author").get("id"), user.getId()));
+        }
         return postRepository.findAll(spec, pageable).map(postMapper::toResponseDto);
     }
 
-    // 投稿を1件をIDで取得し、アクセス権をチェック
-    @Transactional(readOnly = true)
-    public Optional<PostResponseDto> findById(Long id, Long currentUserId, User.Role userRole) {
-        return postRepository.findById(id).map(post -> {
-            checkAccessOrThrow(post, currentUserId, userRole);
-            return postMapper.toResponseDto(post);
-        });
-    }
-
-    // 投稿を1件をIDで取得し、アクセス権をチェック（管理者権限で実行）
-    @Transactional(readOnly = true)
-    public Optional<PostResponseDto> findById(Long id) {
-        return postRepository.findById(id)
-                .map(post -> postMapper.toResponseDto(post, true));
-    }
-
-    // 投稿を作成
     @Transactional
-    public PostResponseDto create(PostRequestDto dto, Long currentUserId, User.Role userRole) {
-        postPolicy.checkCreate(userRole, dto.getAuthorId(), currentUserId);
+    public PostResponseDto create(PostRequestDto dto, User user) {
+        postPolicy.checkCreate(user.getRole(), dto.getAuthorId(), null, user.getId());
         Post post = new Post();
         postMapper.applyToEntity(post, dto);
         applyTags(post, dto.getTags());
@@ -113,18 +103,14 @@ public class PostService {
         return postMapper.toResponseDto(saved);
     }
 
-    // 投稿を作成（管理者権限で実行）
     @Transactional
-    public PostResponseDto create(PostRequestDto dto) {
-        return create(dto, 1L, User.Role.ADMIN);
-    }
-
-    // 投稿を1件更新し、アクセス権をチェック
-    @Transactional
-    public Optional<PostResponseDto> update(Long id, PostRequestDto dto, Long currentUserId, User.Role userRole) {
+    public Optional<PostResponseDto> update(Long id, PostRequestDto dto, User user) {
         return postRepository.findById(id).map(post -> {
             Long authorId = (post.getAuthor() != null) ? post.getAuthor().getId() : null;
-            postPolicy.checkUpdate(userRole, authorId, dto.getAuthorId(), currentUserId, dto);
+            if (user.getRole() == User.Role.AUTHOR && "PUBLISHED".equals(dto.getStatus())) {
+                throw new com.example.backend.exception.AccessDeniedException("Authors cannot publish posts");
+            }
+            postPolicy.checkUpdate(user.getRole(), authorId, dto.getAuthorId(), user.getId());
             postMapper.applyToEntity(post, dto);
             applyTags(post, dto.getTags());
             if ("PUBLISHED".equals(dto.getStatus()) && post.getPublishedAt() == null) {
@@ -134,25 +120,23 @@ public class PostService {
         });
     }
 
-    // 投稿を1件更新し、アクセス権をチェック（管理者権限で実行）
     @Transactional
-    public Optional<PostResponseDto> update(Long id, PostRequestDto dto) {
-        return update(id, dto, 1L, User.Role.ADMIN);
-    }
-
-    @Transactional
-    public void delete(Long id, Long currentUserId, User.Role userRole) {
+    public void delete(Long id, User user) {
         Post post = postRepository.findById(id)
                 .orElseThrow(() -> new com.example.backend.exception.PostNotFoundException(id));
         Long authorId = (post.getAuthor() != null) ? post.getAuthor().getId() : null;
-        postPolicy.checkDelete(userRole, authorId, currentUserId);
+        postPolicy.checkDelete(user.getRole(), authorId, null, user.getId());
         postRepository.deleteById(id);
     }
 
-    // Backward-compatible: treat as ADMIN internally
-    @Transactional
-    public void delete(Long id) {
-        delete(id, 1L, User.Role.ADMIN);
+    // 投稿のアクセス権判定（RBAC）
+    private boolean canAccess(Post post, User user) {
+        if (user.getRole() == User.Role.ADMIN || user.getRole() == User.Role.EDITOR)
+            return true;
+        if (user.getRole() == User.Role.AUTHOR) {
+            return post.getAuthor() != null && user.getId().equals(post.getAuthor().getId());
+        }
+        return false;
     }
 
     private void applyTags(Post post, List<String> tagSlugs) {
@@ -165,4 +149,5 @@ public class PostService {
         List<Tag> tags = tagService.findAllBySlugs(tagSlugs);
         post.setTags(new ArrayList<>(tags));
     }
+
 }

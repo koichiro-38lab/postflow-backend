@@ -4,7 +4,7 @@ import com.example.backend.dto.post.PostRequestDto;
 import com.example.backend.dto.post.PostResponseDto;
 import com.example.backend.service.PostService;
 import com.example.backend.entity.User;
-import com.example.backend.repository.UserRepository;
+import com.example.backend.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -13,9 +13,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 import java.net.URI;
-import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -24,7 +21,7 @@ import org.springframework.data.domain.Pageable;
 @RequiredArgsConstructor
 public class PostController {
     private final PostService postService;
-    private final UserRepository userRepository;
+    private final UserService userService;
 
     // 投稿一覧取得 (認証ユーザーのみ、ADMIN, EDITORは全件、AUTHORは自分の投稿のみ)
     @GetMapping
@@ -37,20 +34,9 @@ public class PostController {
             @RequestParam(required = false, name = "tag") String tagParam,
             Pageable pageable,
             @AuthenticationPrincipal Jwt jwt) {
-        User currentUser = requireUser(jwt);
-        String role = currentUser.getRole().name();
-        Long userId = currentUser.getId();
-
-        if (!"ADMIN".equals(role) && !"EDITOR".equals(role)) {
-            authorId = userId;
-        }
-        List<String> tags = parseTags(tagParam);
-        if (title == null && slug == null && status == null && authorId == null && categoryId == null
-                && tags.isEmpty()) {
-            return postService.findAll(pageable);
-        } else {
-            return postService.search(title, slug, status, authorId, categoryId, tags, pageable);
-        }
+        User currentUser = userService.getCurrentUser(jwt);
+        return postService.searchWithAccessControl(
+                title, slug, status, authorId, categoryId, tagParam, pageable, currentUser);
     }
 
     // 投稿IDで取得 (認証ユーザーのみ、ADMIN, EDITORは全件、AUTHORは自分の投稿のみ)
@@ -58,8 +44,8 @@ public class PostController {
     public ResponseEntity<PostResponseDto> getById(
             @PathVariable Long id,
             @AuthenticationPrincipal Jwt jwt) {
-        User currentUser = requireUser(jwt);
-        return postService.findById(id, currentUser.getId(), currentUser.getRole())
+        User currentUser = userService.getCurrentUser(jwt);
+        return postService.findByIdWithAccessControl(id, currentUser)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -69,8 +55,8 @@ public class PostController {
     public ResponseEntity<PostResponseDto> create(
             @RequestBody @Valid PostRequestDto dto,
             @AuthenticationPrincipal Jwt jwt) {
-        User currentUser = requireUser(jwt);
-        PostResponseDto created = postService.create(dto, currentUser.getId(), currentUser.getRole());
+        User currentUser = userService.getCurrentUser(jwt);
+        PostResponseDto created = postService.create(dto, currentUser);
         return ResponseEntity.created(URI.create("/api/posts/" + created.getId())).body(created);
     }
 
@@ -80,8 +66,8 @@ public class PostController {
             @PathVariable Long id,
             @RequestBody @Valid PostRequestDto dto,
             @AuthenticationPrincipal Jwt jwt) {
-        User currentUser = requireUser(jwt);
-        return postService.update(id, dto, currentUser.getId(), currentUser.getRole())
+        User currentUser = userService.getCurrentUser(jwt);
+        return postService.update(id, dto, currentUser)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -91,29 +77,10 @@ public class PostController {
     public ResponseEntity<Void> delete(
             @PathVariable Long id,
             @AuthenticationPrincipal Jwt jwt) {
-        User currentUser = requireUser(jwt);
-        postService.delete(id, currentUser.getId(), currentUser.getRole());
+        User currentUser = userService.getCurrentUser(jwt);
+        postService.delete(id, currentUser);
         return ResponseEntity.noContent().build();
     }
 
-    // ユーザー取得
-    private User requireUser(Jwt jwt) {
-        if (jwt == null) {
-            throw new com.example.backend.exception.AccessDeniedException("Authentication required");
-        }
-        String email = jwt.getSubject();
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new com.example.backend.exception.AccessDeniedException("Authentication required"));
-    }
-
-    // カンマ区切りのタグ文字列をリストに変換
-    private List<String> parseTags(String tags) {
-        if (tags == null || tags.isBlank()) {
-            return List.of();
-        }
-        return Arrays.stream(tags.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .collect(Collectors.toList());
-    }
+    // コントローラーは認証・リクエスト受信・サービス呼び出し・レスポンス返却のみ担当
 }

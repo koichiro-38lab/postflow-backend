@@ -84,3 +84,38 @@ Authorization: Bearer {{admin_token}}
 # 注：このタグが投稿に紐づいている場合は削除できず、409エラーになります
 DELETE http://localhost:8100/api/admin/tags/1
 Authorization: Bearer {{admin_token}}
+
+### カテゴリ一覧取得（ADMINユーザー）
+GET http://localhost:8100/api/admin/categories
+Authorization: Bearer {{admin_token}}
+
+### カテゴリを作成（ADMINユーザー）
+POST http://localhost:8100/api/admin/categories
+Content-Type: application/json
+Authorization: Bearer {{admin_token}}
+
+{
+    "name": "admin-test-category",
+    "slug": "admin-test-category",
+    "parentId": null
+}
+
+### 特定のIDのカテゴリを取得（ADMINユーザー）
+GET http://localhost:8100/api/admin/categories/1
+Authorization: Bearer {{admin_token}}
+
+### カテゴリを更新（ADMINユーザー）
+PUT http://localhost:8100/api/admin/categories/1
+Content-Type: application/json
+Authorization: Bearer {{admin_token}}
+
+{
+    "name": "updated-admin-category",
+    "slug": "updated-admin-category",
+    "parentId": null
+}
+
+### カテゴリを削除（ADMINユーザー）
+# 注：このカテゴリが投稿に紐づいている場合は削除できず、409エラーになります
+DELETE http://localhost:8100/api/admin/categories/1
+Authorization: Bearer {{admin_token}}

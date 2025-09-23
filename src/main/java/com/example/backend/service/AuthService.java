@@ -5,20 +5,23 @@ import com.example.backend.dto.auth.AuthResponseDto;
 import com.example.backend.dto.auth.LoginRequestDto;
 import com.example.backend.entity.RefreshToken;
 import com.example.backend.entity.User;
-import com.example.backend.exception.InvalidCredentialsException;
 import com.example.backend.exception.InvalidRefreshTokenException;
 import com.example.backend.repository.RefreshTokenRepository;
 import com.example.backend.repository.UserRepository;
+import com.example.backend.service.JwtTokenService.TokenPair;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.HexFormat;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Service
 @RequiredArgsConstructor
@@ -34,33 +37,36 @@ public class AuthService {
     @Transactional
     public AuthResponseDto login(LoginRequestDto request, String userAgent, String ipAddress) {
         User user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> new InvalidCredentialsException("Invalid email or password"));
+                .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
 
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-            throw new InvalidCredentialsException("Invalid email or password");
+            throw new BadCredentialsException("Invalid email or password");
         }
 
-        var roles = List.of(user.getRole().name());
-        var pair = jwtTokenService.issueTokens(user.getEmail(), roles);
+        TokenPair pair = jwtTokenService.issueTokens(user.getEmail(), List.of(user.getRole().name()));
 
-        // 保存: refresh token のハッシュとメタ
-        var verified = jwtTokenService.verify(pair.refreshToken());
-        var entity = RefreshToken.builder()
+        RefreshToken refreshToken = RefreshToken.builder()
                 .user(user)
                 .tokenHash(sha256Hex(pair.refreshToken()))
-                .expiresAt(LocalDateTime.ofInstant(verified.expiresAt(), java.time.ZoneOffset.UTC))
+                .issuedAt(clock.instant().atZone(ZoneId.systemDefault()).toLocalDateTime())
+                .expiresAt(clock.instant().plus(jwtProperties.getRefreshTtl()).atZone(ZoneId.systemDefault())
+                        .toLocalDateTime())
                 .userAgent(userAgent)
                 .ipAddress(ipAddress)
                 .build();
-        refreshTokenRepository.save(entity);
 
-        long expiresIn = jwtProperties.getAccessTtl().toSeconds();
+        refreshTokenRepository.save(refreshToken);
+
+        Duration accessTtl = jwtProperties.getAccessTtl();
+        long expiresIn = accessTtl.toSeconds();
+
         return new AuthResponseDto(pair.accessToken(), pair.refreshToken(), "Bearer", expiresIn);
     }
 
     @Transactional
     public AuthResponseDto refresh(String refreshTokenRaw, String userAgent, String ipAddress) {
         String hash = sha256Hex(refreshTokenRaw);
+
         RefreshToken token = refreshTokenRepository.findByTokenHash(hash)
                 .orElseThrow(() -> new InvalidRefreshTokenException("Invalid refresh token"));
 
@@ -81,6 +87,7 @@ public class AuthService {
         }
 
         // ローテーション: 旧トークンは失効
+        System.out.println("DEBUG: Revoking old token with ID: " + token.getId());
         token.setRevokedAt(LocalDateTime.now(clock));
         refreshTokenRepository.save(token);
 
@@ -88,17 +95,23 @@ public class AuthService {
         var roles = List.of(user.getRole().name());
         var pair = jwtTokenService.issueTokens(user.getEmail(), roles);
 
+        System.out.println("DEBUG: Generated new refresh token: " + pair.refreshToken().substring(0, 20) + "...");
+        System.out.println("DEBUG: New token hash: " + sha256Hex(pair.refreshToken()));
+
         var verifiedNew = jwtTokenService.verify(pair.refreshToken());
         var newEntity = RefreshToken.builder()
                 .user(user)
                 .tokenHash(sha256Hex(pair.refreshToken()))
                 .expiresAt(LocalDateTime.ofInstant(verifiedNew.expiresAt(), java.time.ZoneOffset.UTC))
+                .issuedAt(clock.instant().atZone(ZoneId.systemDefault()).toLocalDateTime())
                 .userAgent(userAgent)
                 .ipAddress(ipAddress)
                 .build();
-        refreshTokenRepository.save(newEntity);
+        RefreshToken savedToken = refreshTokenRepository.save(newEntity);
+        System.out.println("DEBUG: Saved new token with ID: " + savedToken.getId());
 
         long expiresIn = jwtProperties.getAccessTtl().toSeconds();
+        System.out.println("DEBUG: AuthService.refresh() END");
         return new AuthResponseDto(pair.accessToken(), pair.refreshToken(), "Bearer", expiresIn);
     }
 

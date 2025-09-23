@@ -25,7 +25,8 @@ public class AuthController {
     public ResponseEntity<AuthResponseDto> login(@Valid @RequestBody LoginRequestDto request, HttpServletRequest http) {
         String ua = http.getHeader("User-Agent");
         String ip = resolveIp(http);
-        return ResponseEntity.ok(authService.login(request, ua, ip));
+        AuthResponseDto response = authService.login(request, ua, ip);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/refresh")
@@ -33,7 +34,8 @@ public class AuthController {
             HttpServletRequest http) {
         String ua = http.getHeader("User-Agent");
         String ip = resolveIp(http);
-        return ResponseEntity.ok(authService.refresh(request.refreshToken(), ua, ip));
+        AuthResponseDto response = authService.refresh(request.refreshToken(), ua, ip);
+        return ResponseEntity.ok(response);
     }
 
     private String resolveIp(HttpServletRequest http) {

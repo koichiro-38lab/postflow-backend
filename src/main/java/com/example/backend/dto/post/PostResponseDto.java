@@ -1,7 +1,7 @@
 package com.example.backend.dto.post;
 
 import lombok.*;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Data
@@ -19,7 +19,7 @@ public class PostResponseDto {
     private AuthorSummaryDto author;
     private CategorySummaryDto category;
     private List<TagSummaryDto> tags;
-    private LocalDateTime publishedAt;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private OffsetDateTime publishedAt;
+    private OffsetDateTime createdAt;
+    private OffsetDateTime updatedAt;
 }

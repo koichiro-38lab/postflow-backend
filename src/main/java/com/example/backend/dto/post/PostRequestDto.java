@@ -2,6 +2,7 @@ package com.example.backend.dto.post;
 
 import lombok.*;
 import jakarta.validation.constraints.*;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Data
@@ -31,5 +32,5 @@ public class PostRequestDto {
     private Long authorId;
     private Long categoryId;
     private List<String> tags;
-    private String publishedAt;
+    private OffsetDateTime publishedAt;
 }

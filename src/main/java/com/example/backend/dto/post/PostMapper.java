@@ -13,6 +13,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 @Component
@@ -65,9 +67,9 @@ public class PostMapper {
                                         .build())
                                 .toList()
                         : List.of())
-                .publishedAt(post.getPublishedAt())
-                .createdAt(post.getCreatedAt())
-                .updatedAt(post.getUpdatedAt());
+                .publishedAt(toOffsetDateTime(post.getPublishedAt()))
+                .createdAt(toOffsetDateTime(post.getCreatedAt()))
+                .updatedAt(toOffsetDateTime(post.getUpdatedAt()));
         return builder.build();
     }
 
@@ -119,11 +121,19 @@ public class PostMapper {
         }
     }
 
-    private void setPublishedAt(Post post, String publishedAt) {
-        if (publishedAt != null && !publishedAt.isBlank()) {
-            post.setPublishedAt(java.time.LocalDateTime.parse(publishedAt));
+    private void setPublishedAt(Post post, java.time.OffsetDateTime publishedAt) {
+        if (publishedAt != null) {
+            post.setPublishedAt(java.time.LocalDateTime.ofInstant(
+                    publishedAt.toInstant(), java.time.ZoneOffset.UTC));
         } else {
             post.setPublishedAt(null);
         }
+    }
+
+    private OffsetDateTime toOffsetDateTime(java.time.LocalDateTime dateTime) {
+        if (dateTime == null) {
+            return null;
+        }
+        return dateTime.atOffset(ZoneOffset.UTC);
     }
 }

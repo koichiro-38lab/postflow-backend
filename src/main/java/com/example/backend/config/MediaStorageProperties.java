@@ -52,5 +52,5 @@ public class MediaStorageProperties {
     /**
      * Optional folder prefix added to every generated storage key.
      */
-    private String keyPrefix = "media";
+    private String keyPrefix;
 }

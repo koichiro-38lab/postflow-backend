@@ -169,11 +169,18 @@ public class MediaService {
 
     private String buildStorageKey(String filename) {
         LocalDateTime now = LocalDateTime.now(clock);
-        String prefix = StringUtils.hasText(mediaProperties.getKeyPrefix()) ? mediaProperties.getKeyPrefix() : "media";
-        prefix = trimSlashes(prefix);
         String extension = extractExtension(filename);
-        String path = String.format("%s/%d/%02d/%s%s", prefix, now.getYear(), now.getMonthValue(), UUID.randomUUID(),
+        String basePath = String.format("%d/%02d/%s%s", now.getYear(), now.getMonthValue(), UUID.randomUUID(),
                 extension);
+
+        String prefix = mediaProperties.getKeyPrefix();
+        if (StringUtils.hasText(prefix)) {
+            prefix = trimSlashes(prefix);
+        } else {
+            prefix = null;
+        }
+
+        String path = prefix != null && !prefix.isEmpty() ? prefix + "/" + basePath : basePath;
         return path;
     }
 

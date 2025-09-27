@@ -7,17 +7,17 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.example.backend.service.media.MediaStorage;
 
 @Configuration
+@ConditionalOnProperty(prefix = "app.media", name = "use-in-memory", havingValue = "true", matchIfMissing = true)
 public class InMemoryMediaStorageConfig {
 
     @Bean
-    @ConditionalOnMissingBean(MediaStorage.class)
     public MediaStorage inMemoryMediaStorage(Clock clock) {
         return new InMemoryMediaStorage(clock);
     }

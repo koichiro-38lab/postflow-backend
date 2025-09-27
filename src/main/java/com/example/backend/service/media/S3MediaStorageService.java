@@ -25,6 +25,7 @@ import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequ
 import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
+import software.amazon.awssdk.services.s3.S3Configuration;
 
 @RequiredArgsConstructor
 public class S3MediaStorageService implements MediaStorage {
@@ -117,8 +118,10 @@ public class S3MediaStorageService implements MediaStorage {
         if (properties.getEndpoint() != null) {
             builder.endpointOverride(properties.getEndpoint());
         }
-
-        builder.forcePathStyle(properties.isPathStyleAccess());
+        S3Configuration serviceConfiguration = S3Configuration.builder()
+                .pathStyleAccessEnabled(properties.isPathStyleAccess())
+                .build();
+        builder.serviceConfiguration(serviceConfiguration);
 
         return builder.build();
     }
@@ -134,6 +137,9 @@ public class S3MediaStorageService implements MediaStorage {
         if (properties.getEndpoint() != null) {
             builder.endpointOverride(properties.getEndpoint());
         }
+        builder.serviceConfiguration(S3Configuration.builder()
+                .pathStyleAccessEnabled(properties.isPathStyleAccess())
+                .build());
         return builder.build();
     }
 

@@ -18,7 +18,7 @@ import java.time.ZoneId;
 import java.util.HexFormat;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.authentication.BadCredentialsException;
+import com.example.backend.exception.InvalidCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,10 +37,10 @@ public class AuthService {
     @Transactional
     public AuthResponseDto login(LoginRequestDto request, String userAgent, String ipAddress) {
         User user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
+                .orElseThrow(() -> new InvalidCredentialsException("Invalid email or password"));
 
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-            throw new BadCredentialsException("Invalid email or password");
+            throw new InvalidCredentialsException("Invalid email or password");
         }
 
         TokenPair pair = jwtTokenService.issueTokens(user.getEmail(), List.of(user.getRole().name()));

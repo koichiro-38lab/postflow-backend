@@ -58,7 +58,10 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(java.util.Arrays.asList("http://localhost:*"));
+        configuration.setAllowedOriginPatterns(java.util.Arrays.asList(
+            "http://localhost:*",
+            "http://100.118.151.11:*"  // 開発用Tailscale IPを追加
+    ));
         configuration.setAllowedMethods(java.util.Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(java.util.Arrays.asList("*"));
         configuration.setAllowCredentials(true);

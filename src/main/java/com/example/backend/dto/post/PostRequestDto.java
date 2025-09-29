@@ -32,5 +32,6 @@ public class PostRequestDto {
     private Long authorId;
     private Long categoryId;
     private List<String> tags;
+    private List<Long> tagIds;
     private OffsetDateTime publishedAt;
 }

@@ -92,6 +92,24 @@ public class TagService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<Tag> findAllByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        List<Tag> tags = tagRepository.findAllById(ids);
+        Set<Long> foundIds = tags.stream()
+                .map(Tag::getId)
+                .collect(Collectors.toSet());
+        List<Long> missing = ids.stream()
+                .filter(id -> !foundIds.contains(id))
+                .toList();
+        if (!missing.isEmpty()) {
+            throw new IllegalArgumentException("Tag not found: " + missing);
+        }
+        return tags;
+    }
+
     private String normalizeName(String value) {
         if (value == null) {
             throw new IllegalArgumentException("Tag name must not be null");

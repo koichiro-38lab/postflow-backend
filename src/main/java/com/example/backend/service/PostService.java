@@ -81,7 +81,9 @@ public class PostService {
         if (!tagSlugs.isEmpty()) {
             List<String> normalizedTagSlugs = tagSlugs.stream().map(tagService::normalizeSlug).toList();
             spec = spec.and((root, query, cb) -> {
-                query.distinct(true);
+                if (query != null) {
+                    query.distinct(true);
+                }
                 var tagsJoin = root.join("tags");
                 return tagsJoin.get("slug").in(normalizedTagSlugs);
             });
@@ -98,7 +100,7 @@ public class PostService {
         postPolicy.checkCreate(user.getRole(), dto.getAuthorId(), null, user.getId());
         Post post = new Post();
         postMapper.applyToEntity(post, dto);
-        applyTags(post, dto.getTags());
+        applyTags(post, dto.getTags(), dto.getTagIds());
         Post saved = postRepository.save(post);
         return postMapper.toResponseDto(saved);
     }
@@ -112,7 +114,7 @@ public class PostService {
             }
             postPolicy.checkUpdate(user.getRole(), authorId, dto.getAuthorId(), user.getId());
             postMapper.applyToEntity(post, dto);
-            applyTags(post, dto.getTags());
+            applyTags(post, dto.getTags(), dto.getTagIds());
             if ("PUBLISHED".equals(dto.getStatus()) && post.getPublishedAt() == null) {
                 post.setPublishedAt(LocalDateTime.now(clock));
             }
@@ -139,15 +141,15 @@ public class PostService {
         return false;
     }
 
-    private void applyTags(Post post, List<String> tagSlugs) {
-        if (tagSlugs == null) {
-            if (post.getTags() == null) {
-                post.setTags(new ArrayList<>());
-            }
-            return;
+    private void applyTags(Post post, List<String> tagSlugs, List<Long> tagIds) {
+        List<Tag> tags = new ArrayList<>();
+        if (tagSlugs != null && !tagSlugs.isEmpty()) {
+            tags.addAll(tagService.findAllBySlugs(tagSlugs));
         }
-        List<Tag> tags = tagService.findAllBySlugs(tagSlugs);
-        post.setTags(new ArrayList<>(tags));
+        if (tagIds != null && !tagIds.isEmpty()) {
+            tags.addAll(tagService.findAllByIds(tagIds));
+        }
+        post.setTags(tags);
     }
 
 }

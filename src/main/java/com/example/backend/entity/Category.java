@@ -28,6 +28,10 @@ public class Category {
     @JoinColumn(name = "parent_id")
     private Category parent;
 
+    @Column(name = "sort_order", nullable = false)
+    @Builder.Default
+    private Integer sortOrder = 0;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

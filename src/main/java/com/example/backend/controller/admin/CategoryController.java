@@ -2,6 +2,7 @@ package com.example.backend.controller.admin;
 
 import com.example.backend.dto.category.CategoryRequestDto;
 import com.example.backend.dto.category.CategoryResponseDto;
+import com.example.backend.dto.category.CategoryReorderRequestDto;
 import com.example.backend.service.CategoryService;
 import com.example.backend.entity.User;
 import com.example.backend.service.UserService;
@@ -24,7 +25,7 @@ public class CategoryController {
 
     @GetMapping
     public List<CategoryResponseDto> getCategories(@AuthenticationPrincipal Jwt jwt) {
-        return categoryService.findAll();
+        return categoryService.findAllWithPostCount();
     }
 
     @GetMapping("/{id}")
@@ -64,5 +65,14 @@ public class CategoryController {
         User currentUser = userService.getCurrentUser(jwt);
         categoryService.delete(id, currentUser);
         return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/reorder")
+    public ResponseEntity<Void> reorderCategories(
+            @RequestBody @Valid List<CategoryReorderRequestDto> reorderRequests,
+            @AuthenticationPrincipal Jwt jwt) {
+        User currentUser = userService.getCurrentUser(jwt);
+        categoryService.reorderCategories(reorderRequests, currentUser);
+        return ResponseEntity.ok().build();
     }
 }

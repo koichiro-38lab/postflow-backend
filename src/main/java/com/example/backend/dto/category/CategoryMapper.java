@@ -17,6 +17,23 @@ public class CategoryMapper {
                         category.getParent().getId(),
                         category.getParent().getName(),
                         category.getParent().getSlug()) : null,
+                category.getSortOrder(),
+                0, // postCount は別途設定
+                category.getCreatedAt(),
+                category.getUpdatedAt());
+    }
+
+    public CategoryResponseDto toResponseDtoWithPostCount(Category category, int postCount) {
+        return new CategoryResponseDto(
+                category.getId(),
+                category.getName(),
+                category.getSlug(),
+                category.getParent() != null ? new CategorySummaryDto(
+                        category.getParent().getId(),
+                        category.getParent().getName(),
+                        category.getParent().getSlug()) : null,
+                category.getSortOrder(),
+                postCount,
                 category.getCreatedAt(),
                 category.getUpdatedAt());
     }

@@ -7,6 +7,8 @@ public record CategoryResponseDto(
         String name,
         String slug,
         CategorySummaryDto parent,
+        Integer sortOrder,
+        Integer postCount,
         LocalDateTime createdAt,
         LocalDateTime updatedAt) {
 }

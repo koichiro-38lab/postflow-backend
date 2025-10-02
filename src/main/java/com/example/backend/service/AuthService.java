@@ -43,6 +43,10 @@ public class AuthService {
             throw new InvalidCredentialsException("Invalid email or password");
         }
 
+        // ログイン成功時に最終ログイン日時を更新
+        user.setLastLoginAt(LocalDateTime.now(clock));
+        userRepository.save(user);
+
         TokenPair pair = jwtTokenService.issueTokens(user.getEmail(), List.of(user.getRole().name()));
 
         RefreshToken refreshToken = RefreshToken.builder()

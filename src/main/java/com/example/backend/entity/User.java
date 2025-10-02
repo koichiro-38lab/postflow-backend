@@ -30,6 +30,34 @@ public class User {
     @Column(nullable = false, length = 20)
     private Role role;
 
+    // プロフィール情報
+    @Column(name = "display_name", length = 100)
+    private String displayName;
+
+    @Column(name = "bio", columnDefinition = "TEXT")
+    private String bio;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "avatar_media_id")
+    private Media avatarMedia;
+
+    // アカウント状態管理
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    @Builder.Default
+    private UserStatus status = UserStatus.ACTIVE;
+
+    @Column(name = "email_verified", nullable = false)
+    @Builder.Default
+    private Boolean emailVerified = false;
+
+    @Column(name = "email_verified_at")
+    private LocalDateTime emailVerifiedAt;
+
+    // セキュリティ強化
+    @Column(name = "last_login_at")
+    private LocalDateTime lastLoginAt;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

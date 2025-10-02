@@ -5,7 +5,7 @@ import com.example.backend.entity.UserStatus;
 
 import java.time.LocalDateTime;
 
-public record UserResponseDto(
+public record UserProfileResponseDto(
         Long id,
         String email,
         User.Role role,

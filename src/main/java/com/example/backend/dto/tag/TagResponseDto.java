@@ -14,6 +14,7 @@ public class TagResponseDto {
     private Long id;
     private String name;
     private String slug;
+    private Long postCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

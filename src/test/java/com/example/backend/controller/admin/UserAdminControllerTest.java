@@ -338,4 +338,170 @@ class UserAdminControllerTest {
                 .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isNoContent());
     }
+
+    // ========== ユーザー管理機能のテスト ==========
+
+    // ユーザー一覧取得（ページング）成功は200
+    @Test
+    void getAllUsers_withPagination_should_return_200() throws Exception {
+        var loginReq = new LoginRequestDto("admin@example.com", "password123");
+        var loginRes = mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+
+        mockMvc.perform(get("/api/admin/users?page=0&size=10")
+                .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.pageable").exists())
+                .andExpect(jsonPath("$.totalElements").exists());
+    }
+
+    // ユーザー一覧取得（ステータスフィルタ）成功は200
+    @Test
+    void getAllUsers_withStatusFilter_should_return_200() throws Exception {
+        var loginReq = new LoginRequestDto("admin@example.com", "password123");
+        var loginRes = mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+
+        mockMvc.perform(get("/api/admin/users?status=ACTIVE")
+                .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray());
+    }
+
+    // ユーザーステータス変更成功は200
+    @Test
+    void updateUserStatus_success_should_return_200() throws Exception {
+        var loginReq = new LoginRequestDto("admin@example.com", "password123");
+        var loginRes = mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+
+        // 作成
+        String testEmail = "statususer" + System.currentTimeMillis() + "@example.com";
+        var createReq = new UserRequestDto(testEmail, "password123", "AUTHOR");
+        var createRes = mockMvc.perform(post("/api/admin/users")
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createReq)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long userId = Long.valueOf((Integer) JsonPath.read(createRes, "$.id"));
+        createdUserIds.add(userId);
+
+        // ステータス変更
+        var statusReq = "{\"status\": \"INACTIVE\"}";
+        mockMvc.perform(patch("/api/admin/users/" + userId + "/status")
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(statusReq))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("INACTIVE"));
+    }
+
+    // 自分自身のステータス変更は403
+    @Test
+    void updateUserStatus_self_should_return_403() throws Exception {
+        var loginReq = new LoginRequestDto("admin@example.com", "password123");
+        var loginRes = mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+
+        // admin ユーザーの ID を取得（TestDataConfig で id=1）
+        Long adminId = 1L;
+
+        // 自分自身のステータス変更を試みる
+        var statusReq = "{\"status\": \"INACTIVE\"}";
+        mockMvc.perform(patch("/api/admin/users/" + adminId + "/status")
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(statusReq))
+                .andExpect(status().isForbidden());
+    }
+
+    // ユーザーロール変更成功は200
+    @Test
+    void updateUserRole_success_should_return_200() throws Exception {
+        var loginReq = new LoginRequestDto("admin@example.com", "password123");
+        var loginRes = mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+
+        // 作成
+        String testEmail = "roleuser" + System.currentTimeMillis() + "@example.com";
+        var createReq = new UserRequestDto(testEmail, "password123", "AUTHOR");
+        var createRes = mockMvc.perform(post("/api/admin/users")
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createReq)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long userId = Long.valueOf((Integer) JsonPath.read(createRes, "$.id"));
+        createdUserIds.add(userId);
+
+        // ロール変更
+        var roleReq = "{\"role\": \"EDITOR\"}";
+        mockMvc.perform(patch("/api/admin/users/" + userId + "/role")
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(roleReq))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("EDITOR"));
+    }
+
+    // 自分自身のロール変更は403
+    @Test
+    void updateUserRole_self_should_return_403() throws Exception {
+        var loginReq = new LoginRequestDto("admin@example.com", "password123");
+        var loginRes = mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+
+        // admin ユーザーの ID を取得（TestDataConfig で id=1）
+        Long adminId = 1L;
+
+        // 自分自身のロール変更を試みる
+        var roleReq = "{\"role\": \"AUTHOR\"}";
+        mockMvc.perform(patch("/api/admin/users/" + adminId + "/role")
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(roleReq))
+                .andExpect(status().isForbidden());
+    }
+
+    // ADMIN以外はユーザー管理機能にアクセスできない
+    @Test
+    void getAllUsers_nonAdmin_should_return_403() throws Exception {
+        var loginReq = new LoginRequestDto("author@example.com", "password123");
+        var loginRes = mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+
+        mockMvc.perform(get("/api/admin/users")
+                .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isForbidden());
+    }
 }

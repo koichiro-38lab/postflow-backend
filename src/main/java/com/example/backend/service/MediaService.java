@@ -115,7 +115,8 @@ public class MediaService {
     @Transactional(readOnly = true)
     public MediaResponseDto getById(Long id, User currentUser) {
         Media media = mediaRepository.findById(id).orElseThrow(() -> new MediaNotFoundException(id));
-        mediaPolicy.checkRead(currentUser.getRole(), media.getCreatedBy().getId(), null, currentUser.getId());
+        mediaPolicy.checkReadForMedia(currentUser.getRole(), media.getId(), media.getCreatedBy().getId(),
+                currentUser.getId());
         return mediaMapper.toResponseDto(media, buildPublicUrl(media));
     }
 

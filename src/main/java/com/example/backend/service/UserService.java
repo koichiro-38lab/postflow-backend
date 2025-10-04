@@ -1,4 +1,3 @@
-
 package com.example.backend.service;
 
 import com.example.backend.dto.user.UserMapper;
@@ -6,6 +5,7 @@ import com.example.backend.dto.user.UserRequestDto;
 import com.example.backend.dto.user.UserResponseDto;
 import com.example.backend.dto.user.UserProfileResponseDto;
 import com.example.backend.dto.user.UserProfileUpdateRequestDto;
+import com.example.backend.dto.user.UserUpdateRequestDto;
 import com.example.backend.entity.Media;
 import com.example.backend.entity.User;
 import com.example.backend.entity.UserStatus;
@@ -43,6 +43,7 @@ public class UserService {
     private final MediaRepository mediaRepository;
     private final PasswordEncoder passwordEncoder;
 
+    // ユーザー作成（旧: 管理画面からの作成時のみ使用）
     @Transactional
     public UserResponseDto createUser(UserRequestDto dto) {
         if (userRepository.existsByEmail(dto.email())) {
@@ -56,6 +57,11 @@ public class UserService {
         user.setEmail(dto.email());
         user.setPasswordHash(passwordEncoder.encode(dto.password()));
         user.setRole(User.Role.valueOf(dto.role()));
+        user.setStatus(UserStatus.ACTIVE);
+        user.setDisplayName(dto.displayName());
+        user.setBio(dto.bio());
+        user.setAvatarMedia(dto.avatarMediaId() != null ? mediaRepository.findById(dto.avatarMediaId())
+                .orElseThrow(() -> new MediaNotFoundException(dto.avatarMediaId())) : null);
         User saved = userRepository.save(user);
         return UserMapper.toResponseDto(saved);
     }
@@ -75,7 +81,7 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
-    // 更新
+    // 更新（旧: 作成時のみ使用）
     @Transactional
     public UserResponseDto updateUser(Long id, UserRequestDto dto) {
         User user = userRepository.findById(id)
@@ -103,6 +109,67 @@ public class UserService {
         return UserMapper.toResponseDto(updated);
     }
 
+    // 管理者によるユーザー更新
+    @Transactional
+    public UserResponseDto updateUserByAdmin(Long id, UserUpdateRequestDto dto) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        // メールアドレスが変更されていて、かつ既に存在する場合
+        if (dto.email() != null && !user.getEmail().equals(dto.email()) && userRepository.existsByEmail(dto.email())) {
+            throw new DuplicateEmailException("Email already exists");
+        }
+
+        // メールアドレス更新
+        if (dto.email() != null) {
+            user.setEmail(dto.email());
+        }
+
+        // パスワードが空でなければ更新
+        if (dto.password() != null && !dto.password().isBlank()) {
+            user.setPasswordHash(passwordEncoder.encode(dto.password()));
+        }
+
+        // 表示名更新
+        if (dto.displayName() != null) {
+            user.setDisplayName(dto.displayName());
+        }
+
+        // 自己紹介更新
+        if (dto.bio() != null) {
+            user.setBio(dto.bio());
+        }
+
+        // アバター更新
+        if (dto.avatarMediaId() != null) {
+            if (dto.avatarMediaId() == 0) {
+                // 0 の場合はアバターを削除
+                user.setAvatarMedia(null);
+            } else {
+                // IDからMediaを取得して設定
+                Media media = mediaRepository.findById(dto.avatarMediaId())
+                        .orElseThrow(() -> new MediaNotFoundException(dto.avatarMediaId()));
+                user.setAvatarMedia(media);
+            }
+        }
+
+        // ロール更新
+        if (dto.role() != null) {
+            if (!isValidRole(dto.role())) {
+                throw new IllegalArgumentException("Invalid role: " + dto.role());
+            }
+            user.setRole(User.Role.valueOf(dto.role()));
+        }
+
+        // ステータス更新
+        if (dto.status() != null) {
+            user.setStatus(dto.status());
+        }
+
+        User updated = userRepository.save(user);
+        return UserMapper.toResponseDto(updated);
+    }
+
     // 許可されたロールか判定（String型）
     private boolean isValidRole(String role) {
         try {
@@ -111,14 +178,6 @@ public class UserService {
         } catch (IllegalArgumentException | NullPointerException e) {
             return false;
         }
-    }
-
-    // 削除
-    public void deleteUser(Long id) {
-        if (!userRepository.existsById(id)) {
-            throw new UserNotFoundException("User not found");
-        }
-        userRepository.deleteById(id);
     }
 
     // ========== プロフィール管理 ==========
@@ -152,8 +211,6 @@ public class UserService {
         User updated = userRepository.save(user);
         return UserMapper.toProfileResponseDto(updated);
     }
-
-    // ========== セキュリティ強化 ==========
 
     // ログイン成功時の最終ログイン日時更新
     @Transactional
@@ -193,5 +250,13 @@ public class UserService {
         user.setRole(role);
         User updated = userRepository.save(user);
         return UserMapper.toResponseDto(updated);
+    }
+
+    // ユーザー削除
+    @Transactional
+    public void deleteUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+        userRepository.delete(user);
     }
 }

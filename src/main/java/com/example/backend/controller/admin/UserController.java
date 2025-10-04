@@ -1,10 +1,13 @@
 package com.example.backend.controller.admin;
 
 import com.example.backend.dto.user.UserMapper;
+import com.example.backend.dto.user.UserProfileResponseDto;
+import com.example.backend.dto.user.UserProfileUpdateRequestDto;
 import com.example.backend.dto.user.UserRequestDto;
 import com.example.backend.dto.user.UserResponseDto;
 import com.example.backend.dto.user.UserRoleUpdateRequestDto;
 import com.example.backend.dto.user.UserStatusUpdateRequestDto;
+import com.example.backend.dto.user.UserUpdateRequestDto;
 import com.example.backend.entity.User;
 import com.example.backend.entity.UserStatus;
 import com.example.backend.security.UserPolicy;
@@ -21,16 +24,19 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/users")
 @RequiredArgsConstructor
-public class UserAdminController {
+public class UserController {
 
     private final UserService userService;
     private final UserPolicy userPolicy;
 
+    /**
+     * ユーザー作成
+     * POST /api/admin/users
+     */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UserResponseDto> createUser(@Valid @RequestBody UserRequestDto dto) {
@@ -68,18 +74,16 @@ public class UserAdminController {
         return ResponseEntity.ok(userService.getUserById(id));
     }
 
+    /**
+     * ユーザー情報更新
+     * PUT /api/admin/users/{id}
+     */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<UserResponseDto> updateUser(@PathVariable Long id, @RequestBody UserRequestDto dto) {
-        UserResponseDto user = userService.updateUser(id, dto);
+    public ResponseEntity<UserResponseDto> updateUser(@PathVariable Long id,
+            @Valid @RequestBody UserUpdateRequestDto dto) {
+        UserResponseDto user = userService.updateUserByAdmin(id, dto);
         return ResponseEntity.ok(user);
-    }
-
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
-        userService.deleteUser(id);
-        return ResponseEntity.noContent().build();
     }
 
     /**
@@ -120,11 +124,50 @@ public class UserAdminController {
         return ResponseEntity.ok(updated);
     }
 
+    /**
+     * ユーザー削除
+     * DELETE /api/admin/users/{id}
+     */
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deleteUser(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long id) {
+        var currentUser = userService.getCurrentUser(jwt);
+        var targetUser = userService.getUserById(id);
+        // 権限チェック（ADMIN のみ、自分以外）
+        userPolicy.checkManageUsers(currentUser);
+        userPolicy.checkChangeUserStatus(currentUser,
+                User.builder().id(targetUser.id()).build());
+        userService.deleteUser(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 自分のユーザー情報取得
+     * GET /api/admin/users/me
+     */
     @GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
     public UserResponseDto getMe(
             @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.oauth2.jwt.Jwt jwt) {
         var user = userService.getCurrentUser(jwt);
         return UserMapper.toResponseDto(user);
+    }
+
+    /**
+     * 自分のプロフィール更新
+     * PUT /api/admin/users/me
+     */
+    @PutMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<UserProfileResponseDto> updateMyProfile(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody UserProfileUpdateRequestDto dto) {
+        var currentUser = userService.getCurrentUser(jwt);
+        // 権限チェック（自分のプロフィールのみ更新可能）
+        userPolicy.checkUpdateProfile(currentUser, currentUser);
+        var updated = userService.updateMyProfile(currentUser, dto);
+        return ResponseEntity.ok(updated);
     }
 }

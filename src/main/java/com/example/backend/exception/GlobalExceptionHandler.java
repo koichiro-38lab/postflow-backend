@@ -90,6 +90,16 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(response, HttpStatus.FORBIDDEN);
     }
 
+    // アカウント無効例外
+    @ExceptionHandler(AccountDisabledException.class)
+    public ResponseEntity<ErrorResponse> handleAccountDisabledException(AccountDisabledException ex) {
+        ErrorResponse response = new ErrorResponse(
+                HttpStatus.FORBIDDEN.value(),
+                "Forbidden",
+                List.of(new ErrorResponse.ValidationError("account", "error.account.disabled")));
+        return new ResponseEntity<>(response, HttpStatus.FORBIDDEN);
+    }
+
     // その他の例外
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneralException(Exception ex) {
@@ -100,6 +110,7 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
+    // 一意制約違反を判定するヘルパーメソッド
     private boolean isUniqueConstraintViolation(Throwable ex) {
         Throwable t = ex;
         while (t != null) {

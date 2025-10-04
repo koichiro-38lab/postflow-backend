@@ -4,5 +4,5 @@ import com.example.backend.entity.UserStatus;
 import jakarta.validation.constraints.NotNull;
 
 public record UserStatusUpdateRequestDto(
-        @NotNull(message = "ステータスは必須です") UserStatus status) {
+        @NotNull(message = "error.status.required") UserStatus status) {
 }

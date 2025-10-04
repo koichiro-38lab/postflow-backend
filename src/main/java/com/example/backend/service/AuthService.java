@@ -5,6 +5,8 @@ import com.example.backend.dto.auth.AuthResponseDto;
 import com.example.backend.dto.auth.LoginRequestDto;
 import com.example.backend.entity.RefreshToken;
 import com.example.backend.entity.User;
+import com.example.backend.entity.UserStatus;
+import com.example.backend.exception.AccountDisabledException;
 import com.example.backend.exception.InvalidRefreshTokenException;
 import com.example.backend.repository.RefreshTokenRepository;
 import com.example.backend.repository.UserRepository;
@@ -34,6 +36,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final java.time.Clock clock;
 
+    // ログイン処理
     @Transactional
     public AuthResponseDto login(LoginRequestDto request, String userAgent, String ipAddress) {
         User user = userRepository.findByEmail(request.email())
@@ -41,6 +44,11 @@ public class AuthService {
 
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw new InvalidCredentialsException("Invalid email or password");
+        }
+
+        // ステータスチェック: ACTIVE のユーザーのみログイン可能
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new AccountDisabledException("Account is disabled. Please contact an administrator.");
         }
 
         // ログイン成功時に最終ログイン日時を更新
@@ -67,6 +75,7 @@ public class AuthService {
         return new AuthResponseDto(pair.accessToken(), pair.refreshToken(), "Bearer", expiresIn);
     }
 
+    // トークンのリフレッシュ
     @Transactional
     public AuthResponseDto refresh(String refreshTokenRaw, String userAgent, String ipAddress) {
         String hash = sha256Hex(refreshTokenRaw);
@@ -90,12 +99,17 @@ public class AuthService {
             throw new InvalidRefreshTokenException("Refresh token subject mismatch");
         }
 
+        User user = token.getUser();
+
+        // ステータスチェック: ACTIVE のユーザーのみトークンリフレッシュ可能
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new AccountDisabledException("Account is disabled. Please contact an administrator.");
+        }
+
         // ローテーション: 旧トークンは失効
         System.out.println("DEBUG: Revoking old token with ID: " + token.getId());
         token.setRevokedAt(LocalDateTime.now(clock));
         refreshTokenRepository.save(token);
-
-        User user = token.getUser();
         var roles = List.of(user.getRole().name());
         var pair = jwtTokenService.issueTokens(user.getEmail(), roles);
 
@@ -119,6 +133,7 @@ public class AuthService {
         return new AuthResponseDto(pair.accessToken(), pair.refreshToken(), "Bearer", expiresIn);
     }
 
+    // SHA-256 ハッシュを生成（トークンの保存に使用）
     private static String sha256Hex(String value) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");

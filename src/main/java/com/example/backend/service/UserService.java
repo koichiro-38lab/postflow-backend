@@ -222,12 +222,15 @@ public class UserService {
     // ========== 管理者用ユーザー管理 ==========
 
     // ユーザー一覧取得（ページング、ステータスフィルタ対応）
-    public Page<UserResponseDto> findAllWithPagination(Pageable pageable, UserStatus status) {
+    public Page<UserResponseDto> findAllWithPagination(Pageable pageable, UserStatus status, User.Role role) {
         Page<User> users;
         if (status != null) {
             users = userRepository.findByStatus(status, pageable);
         } else {
             users = userRepository.findAll(pageable);
+        }
+        if (role != null) {
+            users = userRepository.findByRole(role, pageable);
         }
         return users.map(UserMapper::toResponseDto);
     }

@@ -46,17 +46,18 @@ public class UserController {
 
     /**
      * ユーザー一覧取得（ページング、ステータスフィルタ対応）
-     * GET /api/admin/users?page=0&size=20&status=ACTIVE
+     * GET /api/admin/users?page=0&size=20&status=ACTIVE&role=ADMIN
      */
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Page<UserResponseDto>> getAllUsers(
             @AuthenticationPrincipal Jwt jwt,
             @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable,
-            @RequestParam(required = false) UserStatus status) {
+            @RequestParam(required = false) UserStatus status,
+            @RequestParam(required = false) User.Role role) { // ロールパラメータを追加
         var currentUser = userService.getCurrentUser(jwt);
         userPolicy.checkManageUsers(currentUser);
-        Page<UserResponseDto> users = userService.findAllWithPagination(pageable, status);
+        Page<UserResponseDto> users = userService.findAllWithPagination(pageable, status, role); // role を渡す
         return ResponseEntity.ok(users);
     }
 

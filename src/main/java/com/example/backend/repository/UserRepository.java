@@ -15,5 +15,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Page<User> findByStatus(UserStatus status, Pageable pageable);
 
+    Page<User> findByRole(User.Role role, Pageable pageable);
+
     boolean existsByAvatarMediaId(Long avatarMediaId);
 }

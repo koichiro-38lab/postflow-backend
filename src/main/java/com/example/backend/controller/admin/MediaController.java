@@ -55,11 +55,11 @@ public class MediaController {
     @GetMapping
     public Page<MediaResponseDto> list(
             @RequestParam(required = false) String mime,
-            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String keyword,
             Pageable pageable,
             @AuthenticationPrincipal Jwt jwt) {
         User currentUser = requireUser(jwt);
-        return mediaService.list(mime, q, pageable, currentUser);
+        return mediaService.list(mime, keyword, pageable, currentUser);
     }
 
     @GetMapping("/{id}")

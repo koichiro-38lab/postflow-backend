@@ -4,6 +4,7 @@ import com.example.backend.config.TestClockConfig;
 import com.example.backend.config.TestDataConfig;
 import com.example.backend.dto.auth.LoginRequestDto;
 import com.example.backend.dto.category.CategoryRequestDto;
+import com.example.backend.dto.category.CategoryReorderRequestDto;
 import com.example.backend.repository.CategoryRepository;
 import com.example.backend.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -238,5 +239,87 @@ class CategoryControllerTest {
         mockMvc.perform(delete("/api/admin/categories/" + categoryId)
                 .header("Authorization", "Bearer " + authorToken))
                 .andExpect(status().isForbidden());
+    }
+
+    // 全カテゴリー取得（作成したカテゴリを含むことを確認）
+    @Test
+    void getCategories_should_return_list_and_include_created() throws Exception {
+        // adminでログインしてアクセストークンを取得
+        var loginReq = new LoginRequestDto("admin@example.com", "password123");
+        var loginRes = mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+
+        // findAllで表示されるようにカテゴリを作成
+        String expectedSlug = "integration-category-" + System.currentTimeMillis();
+        var createReq = new CategoryRequestDto("Integration Category", expectedSlug, null);
+        var createRes = mockMvc.perform(post("/api/admin/categories")
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createReq)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long categoryId = Long.valueOf((Integer) JsonPath.read(createRes, "$.id"));
+        createdCategoryIds.add(categoryId);
+
+        // findAllを呼び出し
+        mockMvc.perform(get("/api/admin/categories")
+                .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.slug=='" + expectedSlug + "')]").exists());
+    }
+
+    // カテゴリー並び替え（sortOrderの更新を確認）
+    @Test
+    void reorderCategories_should_update_sort_order() throws Exception {
+        var loginReq = new LoginRequestDto("admin@example.com", "password123");
+        var loginRes = mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+
+        // 並び替え用の2つのカテゴリを作成
+        var req1 = new CategoryRequestDto("Reorder A", "reorder-a-" + System.currentTimeMillis(), null);
+        var res1 = mockMvc.perform(post("/api/admin/categories")
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req1)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long id1 = Long.valueOf((Integer) JsonPath.read(res1, "$.id"));
+        createdCategoryIds.add(id1);
+
+        var req2 = new CategoryRequestDto("Reorder B", "reorder-b-" + System.currentTimeMillis(), null);
+        var res2 = mockMvc.perform(post("/api/admin/categories")
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req2)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long id2 = Long.valueOf((Integer) JsonPath.read(res2, "$.id"));
+        createdCategoryIds.add(id2);
+
+        // 並び替えリクエスト送信: id1をsortOrder 10、id2を0に設定
+        var reorderList = List.of(
+                new CategoryReorderRequestDto(id1, 10),
+                new CategoryReorderRequestDto(id2, 0));
+
+        mockMvc.perform(put("/api/admin/categories/reorder")
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(reorderList)))
+                .andExpect(status().isOk());
+
+        // findAllで新しいsortOrderが反映されていることを確認（DTOにsortOrderフィールドを含む）
+        mockMvc.perform(get("/api/admin/categories")
+                .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id==" + id1 + ")].sortOrder").value(org.hamcrest.Matchers.hasItem(10)))
+                .andExpect(jsonPath("$[?(@.id==" + id2 + ")].sortOrder").value(org.hamcrest.Matchers.hasItem(0)));
     }
 }

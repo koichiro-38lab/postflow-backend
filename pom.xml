@@ -189,6 +189,14 @@
                     </goals>
                     </execution>
                 </executions>
+                <configuration>
+                    <!-- 単純 DTO をカバレッジ計測から除外 -->
+                    <excludes>
+                        <exclude>**/dto/**</exclude>
+                        <exclude>**/*Dto.class</exclude>
+                        <exclude>**/*SummaryDto.class</exclude>
+                    </excludes>
+                </configuration>
             </plugin>
         </plugins>
     </build>

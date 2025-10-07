@@ -58,8 +58,11 @@ class MediaControllerTest {
 
     @AfterEach
     void tearDown() {
+        // 外部キー制約を避けるため、投稿を先に削除
         createdPostIds.forEach(postRepository::deleteById);
         createdPostIds.clear();
+
+        // 作成したメディアのみ削除
         createdMediaIds.forEach(mediaRepository::deleteById);
         createdMediaIds.clear();
     }
@@ -190,6 +193,92 @@ class MediaControllerTest {
                 .andExpect(jsonPath("$.expiresAt").exists());
     }
 
+    // メディア一覧取得（keywordフィルタ）
+    @Test
+    void listMedia_withKeywordFilter() throws Exception {
+        String token = getAccessToken("admin@example.com", "password123");
+
+        // テスト固有のメディアを作成（完全にユニークなキーワード）
+        createMedia(token, "unique999hero777.png", "image/png");
+        createMedia(token, "unique999hero888.jpg", "image/jpeg");
+        createMedia(token, "differentnomatch123.jpg", "image/jpeg");
+
+        String response = mockMvc.perform(get("/api/admin/media")
+                .param("keyword", "unique999hero")
+                .param("size", "10")
+                .param("sort", "createdAt,desc")
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // "unique999hero"を含むファイル名のみが返されることを確認
+        List<String> filenames = JsonPath.read(response, "$.content[*].filename");
+        assertThat(filenames).hasSize(2);
+        assertThat(filenames).allMatch(name -> name.contains("unique999hero"));
+    }
+
+    // メディア一覧取得（mimeとkeyword両方フィルタ）
+    @Test
+    void listMedia_withMimeAndKeywordFilters() throws Exception {
+        String token = getAccessToken("admin@example.com", "password123");
+
+        // テスト固有のメディアを作成（完全にユニークなキーワード）
+        createMedia(token, "ultra888unique666.png", "image/png");
+        createMedia(token, "ultra888unique777.mp4", "video/mp4");
+        createMedia(token, "otherdifferent999.jpg", "image/jpeg");
+
+        String response = mockMvc.perform(get("/api/admin/media")
+                .param("mime", "image")
+                .param("keyword", "ultra888unique")
+                .param("size", "10")
+                .param("sort", "createdAt,desc")
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // "ultra888unique"を含み、かつimage mimeタイプのファイルのみが返されることを確認
+        List<String> filenames = JsonPath.read(response, "$.content[*].filename");
+        List<String> mimeTypes = JsonPath.read(response, "$.content[*].mime");
+
+        assertThat(filenames).hasSize(1);
+        assertThat(filenames).allMatch(name -> name.contains("ultra888unique"));
+        assertThat(mimeTypes).allMatch(mime -> mime.startsWith("image"));
+        assertThat(filenames).contains("ultra888unique666.png");
+    }
+
+    // extractExtensionのさまざまなケースをカバーするためのpresignテスト
+    @Test
+    void presignUpload_variousFilenames() throws Exception {
+        String token = getAccessToken("admin@example.com", "password123");
+
+        // 拡張子なし
+        requestPresign(token, "noextension", "application/octet-stream");
+
+        // ドット始まり
+        requestPresign(token, ".hidden", "application/octet-stream");
+
+        // ドット終わり
+        requestPresign(token, "nodot.", "application/octet-stream");
+
+        // 正常な拡張子
+        requestPresign(token, "normal.jpg", "image/jpeg");
+
+        // 大文字拡張子
+        requestPresign(token, "upper.PNG", "image/png");
+    }
+
+    // ログインしてJWTトークンを取得するヘルパー
+    private String getAccessToken(String email, String password) throws Exception {
+        var loginReq = new LoginRequestDto(email, password);
+        var loginRes = mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return JsonPath.read(loginRes, "$.accessToken");
+    }
+
+    // メディア作成のヘルパー
     private MediaResponseDto createMedia(String token, String filename, String mime) throws Exception {
         MediaPresignResponseDto presign = requestPresign(token, filename, mime);
         mediaStorage.simulateUpload(presign.getStorageKey());
@@ -235,16 +324,5 @@ class MediaControllerTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         return objectMapper.readValue(response, MediaPresignResponseDto.class);
-    }
-
-    // ログインしてJWTトークンを取得するヘルパー
-    private String getAccessToken(String email, String password) throws Exception {
-        var loginReq = new LoginRequestDto(email, password);
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        return JsonPath.read(loginRes, "$.accessToken");
     }
 }

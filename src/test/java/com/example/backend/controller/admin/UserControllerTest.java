@@ -7,6 +7,11 @@ import com.example.backend.dto.user.UserRequestDto;
 import com.example.backend.dto.user.UserUpdateRequestDto;
 import com.example.backend.entity.UserStatus;
 import com.example.backend.repository.UserRepository;
+import com.example.backend.repository.MediaRepository;
+import com.example.backend.entity.Media;
+import com.example.backend.entity.User;
+import com.example.backend.dto.user.UserProfileUpdateRequestDto;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.AfterEach;
@@ -23,6 +28,7 @@ import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -38,7 +44,18 @@ class UserControllerTest {
     @Autowired
     UserRepository userRepository;
 
+    @Autowired
+    com.example.backend.service.UserService userService;
+
     private List<Long> createdUserIds = new ArrayList<>();
+
+    @Autowired
+    MediaRepository mediaRepository;
+
+    @Autowired
+    PasswordEncoder passwordEncoder;
+
+    private List<Long> createdMediaIds = new ArrayList<>();
 
     void setTestClockSecondsOffset(long seconds) {
         TestClockConfig.setOffsetSeconds(seconds);
@@ -49,18 +66,15 @@ class UserControllerTest {
         // テストで作成したユーザーをクリーンアップ
         createdUserIds.forEach(userRepository::deleteById);
         createdUserIds.clear();
+        // テストで作成したメディアをクリーンアップ
+        createdMediaIds.forEach(mediaRepository::deleteById);
+        createdMediaIds.clear();
     }
 
     // メールアドレス未入力でのユーザー登録は400
     @Test
     void createUser_blankEmail_should_return_400() throws Exception {
-        var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("admin@example.com", "password123");
 
         var req = new UserRequestDto("", "password123", "AUTHOR", "Test User", null, null);
         mockMvc.perform(post("/api/admin/users")
@@ -75,13 +89,7 @@ class UserControllerTest {
     // メールアドレス形式不正でのユーザー登録は400
     @Test
     void createUser_invalidEmailFormat_should_return_400() throws Exception {
-        var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("admin@example.com", "password123");
 
         var req = new UserRequestDto("invalid-email-format", "password123", "AUTHOR", "Test User", null, null);
         mockMvc.perform(post("/api/admin/users")
@@ -96,13 +104,7 @@ class UserControllerTest {
     // メールアドレス重複でのユーザー登録は409
     @Test
     void createUser_duplicateEmail_should_return_409() throws Exception {
-        var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("admin@example.com", "password123");
 
         var req = new UserRequestDto("admin@example.com", "password123", "ADMIN", "Test Admin", null, null);
         mockMvc.perform(post("/api/admin/users")
@@ -117,13 +119,7 @@ class UserControllerTest {
     // メールアドレスが短い場合のユーザー登録は400
     @Test
     void createUser_shortEmail_should_return_400() throws Exception {
-        var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("admin@example.com", "password123");
 
         var req = new UserRequestDto("short", "password123", "AUTHOR", "Test User", null, null);
         mockMvc.perform(post("/api/admin/users")
@@ -138,13 +134,7 @@ class UserControllerTest {
     // メールアドレスにSQLインジェクション攻撃コードが含まれる場合のユーザー登録は400
     @Test
     void createUser_sqlInjectionInEmail_should_return_400() throws Exception {
-        var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("admin@example.com", "password123");
 
         var req = new UserRequestDto("admin@example.com' OR '1'='1", "password123", "AUTHOR", "Test User", null, null);
         mockMvc.perform(post("/api/admin/users")
@@ -159,13 +149,7 @@ class UserControllerTest {
     // メールアドレスにXSS攻撃コードが含まれる場合のユーザー登録は400
     @Test
     void createUser_xssInEmail_should_return_400() throws Exception {
-        var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("admin@example.com", "password123");
 
         var req = new UserRequestDto("<script>alert('xss')</script>", "password123", "AUTHOR", "Test User", null, null);
         mockMvc.perform(post("/api/admin/users")
@@ -180,13 +164,7 @@ class UserControllerTest {
     // 不正なロールでのユーザー登録は400
     @Test
     void createUser_invalidRole_should_return_400() throws Exception {
-        var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("admin@example.com", "password123");
 
         // 不正なロールでのユーザー登録
         var createUserReq = new UserRequestDto("newuser" + System.currentTimeMillis() + "@example.com", "password123",
@@ -202,13 +180,7 @@ class UserControllerTest {
     // 管理者ユーザーで /api/admin/users にアクセスして200
     @Test
     void admin_users_should_return_200_after_login() throws Exception {
-        var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("admin@example.com", "password123");
 
         mockMvc.perform(get("/api/admin/users")
                 .header("Authorization", "Bearer " + accessToken))
@@ -218,13 +190,7 @@ class UserControllerTest {
     // 権限のないユーザーで /api/admin/users にアクセスして403
     @Test
     void admin_users_should_return_403_forbidden_for_non_admin_user() throws Exception {
-        var loginReq = new LoginRequestDto("author@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("author@example.com", "password123");
 
         mockMvc.perform(get("/api/admin/users")
                 .header("Authorization", "Bearer " + accessToken))
@@ -235,13 +201,7 @@ class UserControllerTest {
     // 存在しないユーザーの更新は404
     @Test
     void updateUser_notFound_should_return_404() throws Exception {
-        var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("admin@example.com", "password123");
 
         var updateUserReq = new UserRequestDto("nonexistent@example.com", "password123", "AUTHOR", "Test User", null,
                 null);
@@ -256,13 +216,7 @@ class UserControllerTest {
     // ユーザー作成成功は201
     @Test
     void createUser_success_should_return_201() throws Exception {
-        var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("admin@example.com", "password123");
 
         String uniqueEmail = "newuser" + System.currentTimeMillis() + "@example.com";
         var req = new UserRequestDto(uniqueEmail, "password123", "AUTHOR", "Test User", null, null);
@@ -281,13 +235,7 @@ class UserControllerTest {
     // ユーザー更新成功は200
     @Test
     void updateUser_success_should_return_200() throws Exception {
-        var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("admin@example.com", "password123");
 
         // まず作成
         String createEmail = "updateuser" + System.currentTimeMillis() + "@example.com";
@@ -316,13 +264,7 @@ class UserControllerTest {
     // ユーザー削除成功は204
     @Test
     void deleteUser_success_should_return_204() throws Exception {
-        var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("admin@example.com", "password123");
 
         // 作成
         String deleteEmail = "deleteuser" + System.currentTimeMillis() + "@example.com";
@@ -347,13 +289,7 @@ class UserControllerTest {
     // ユーザー一覧取得（ページング）成功は200
     @Test
     void getAllUsers_withPagination_should_return_200() throws Exception {
-        var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("admin@example.com", "password123");
 
         mockMvc.perform(get("/api/admin/users?page=0&size=10")
                 .header("Authorization", "Bearer " + accessToken))
@@ -366,13 +302,7 @@ class UserControllerTest {
     // ユーザー一覧取得（ステータスフィルタ）成功は200
     @Test
     void getAllUsers_withStatusFilter_should_return_200() throws Exception {
-        var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("admin@example.com", "password123");
 
         mockMvc.perform(get("/api/admin/users?status=ACTIVE")
                 .header("Authorization", "Bearer " + accessToken))
@@ -380,16 +310,167 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.content").isArray());
     }
 
+    // アバター設定ありでのユーザー作成はアバターIDが返る
+    @Test
+    void createUser_withAvatar_setsAvatar_serviceFlow() {
+
+        Media media = new Media();
+        media.setFilename("avatar.png");
+        media.setStorageKey("sk-avatar-" + System.currentTimeMillis());
+        media.setMime("image/png");
+        // 作成者はadminユーザー(1L)
+        media.setCreatedBy(userRepository.findById(1L).orElseThrow());
+        media = mediaRepository.save(media);
+        createdMediaIds.add(media.getId());
+
+        String email = "svc-avatar-" + System.currentTimeMillis() + "@example.com";
+        var req = new UserRequestDto(email, "password123", "AUTHOR", "Svc Avatar", "bio", media.getId());
+
+        // 新規ユーザー作成後、アバターIDが設定されることを確認
+        try {
+            String accessToken = getAccessToken("admin@example.com", "password123");
+
+            var createRes = mockMvc.perform(post("/api/admin/users")
+                    .header("Authorization", "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(req)))
+                    .andExpect(status().isCreated())
+                    .andReturn().getResponse().getContentAsString();
+            Long userId = Long.valueOf((Integer) JsonPath.read(createRes, "$.id"));
+            createdUserIds.add(userId);
+
+            var createdAvatarId = (Integer) JsonPath.read(createRes, "$.avatarMediaId");
+            assertEquals(media.getId().intValue(), createdAvatarId.intValue());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    // 新規ユーザー作成でメールアドレス重複は409
+    @Test
+    void createUser_duplicateEmail_throws_serviceFlow() {
+
+        var req = new UserRequestDto("admin@example.com", "password123", "ADMIN", "Dup", null, null);
+        try {
+            var loginReq = new com.example.backend.dto.auth.LoginRequestDto("admin@example.com", "password123");
+            var loginRes = mockMvc.perform(post("/api/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(loginReq)))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            String accessToken = JsonPath.read(loginRes, "$.accessToken");
+
+            mockMvc.perform(post("/api/admin/users")
+                    .header("Authorization", "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(req)))
+                    .andExpect(status().isConflict());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    // パスワード空白でのユーザー更新はパスワード変更されない
+    @Test
+    void updateUser_passwordBlank_keepsPasswordHash_serviceFlow() {
+        // 新規ユーザー作成
+        User u = new User();
+        u.setEmail("svc-pass-" + System.currentTimeMillis() + "@example.com");
+        u.setPasswordHash(passwordEncoder.encode("origPass"));
+        u.setRole(User.Role.AUTHOR);
+        u = userRepository.save(u);
+        Long userId = u.getId();
+        createdUserIds.add(userId);
+
+        // パスワード空白で更新
+        var req = new UserRequestDto(u.getEmail(), "   ", "AUTHOR", "Display", null, null);
+
+        // パスワード変更されていないことを確認
+        var updated = userService.updateUser(userId, req);
+        var fromDb = userRepository.findById(userId).orElseThrow();
+        assertEquals(fromDb.getPasswordHash(), u.getPasswordHash());
+        assertEquals(updated.email(), u.getEmail());
+    }
+
+    // 管理者によるユーザー更新でアバター削除と不正なロール指定はそれぞれ適切に処理される
+    @Test
+    void updateUserByAdmin_avatarRemoval_and_invalidRole_serviceFlow() {
+        // create media and user
+        Media media = new Media();
+        media.setFilename("to-remove.png");
+        media.setStorageKey("sk-remove-" + System.currentTimeMillis());
+        media.setMime("image/png");
+        media.setCreatedBy(userRepository.findById(1L).orElseThrow());
+        media = mediaRepository.save(media);
+        createdMediaIds.add(media.getId());
+
+        User u = new User();
+        u.setEmail("svc-admin-" + System.currentTimeMillis() + "@example.com");
+        u.setPasswordHash(passwordEncoder.encode("pw"));
+        u.setRole(User.Role.AUTHOR);
+        u.setAvatarMedia(media);
+        u = userRepository.save(u);
+        Long adminUserId = u.getId();
+        createdUserIds.add(adminUserId);
+
+        try {
+            String accessToken = getAccessToken("admin@example.com", "password123");
+
+            // avatarMediaIdを0で更新してアバター削除
+            var adminUpdate = new UserUpdateRequestDto(null, null, null, null, 0L, null, null);
+            mockMvc.perform(put("/api/admin/users/" + adminUserId)
+                    .header("Authorization", "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(adminUpdate)))
+                    .andExpect(status().isOk());
+
+            assertNull(userRepository.findById(adminUserId).orElseThrow().getAvatarMedia());
+
+            // 不正なロール指定で更新を試みる
+            var badRoleReq = new UserUpdateRequestDto(null, null, null, null, null, "NO_SUCH_ROLE", null);
+            mockMvc.perform(put("/api/admin/users/" + adminUserId)
+                    .header("Authorization", "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(badRoleReq)))
+                    .andExpect(status().isBadRequest());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    // 自分自身のプロフィール更新でアバターIDが存在しない場合は404
+    @Test
+    void updateMyProfile_avatarNotFound_throws_serviceFlow() {
+        // create user
+        User u = new User();
+        u.setEmail("svc-profile-" + System.currentTimeMillis() + "@example.com");
+        u.setPasswordHash(passwordEncoder.encode("pw"));
+        u.setRole(User.Role.AUTHOR);
+        u = userRepository.save(u);
+        Long profileUserId = u.getId();
+        createdUserIds.add(profileUserId);
+
+        var dto = new UserProfileUpdateRequestDto("Name", "Bio", 999999L);
+        var userEntity = userRepository.findById(profileUserId).orElseThrow();
+        // アバターIDが存在しないことを確認
+        try {
+
+            String accessToken = getAccessToken(userEntity.getEmail(), "pw");
+
+            mockMvc.perform(put("/api/admin/users/me")
+                    .header("Authorization", "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(dto)))
+                    .andExpect(status().isNotFound());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     // ユーザーステータス変更成功は200
     @Test
     void updateUserStatus_success_should_return_200() throws Exception {
-        var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("admin@example.com", "password123");
 
         // 作成
         String testEmail = "statususer" + System.currentTimeMillis() + "@example.com";
@@ -416,13 +497,7 @@ class UserControllerTest {
     // 自分自身のステータス変更は403
     @Test
     void updateUserStatus_self_should_return_403() throws Exception {
-        var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("admin@example.com", "password123");
 
         // admin ユーザーの ID を取得（TestDataConfig で id=1）
         Long adminId = 1L;
@@ -439,13 +514,7 @@ class UserControllerTest {
     // ユーザーロール変更成功は200
     @Test
     void updateUserRole_success_should_return_200() throws Exception {
-        var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("admin@example.com", "password123");
 
         // 作成
         String testEmail = "roleuser" + System.currentTimeMillis() + "@example.com";
@@ -495,31 +564,17 @@ class UserControllerTest {
     // ADMIN以外はユーザー管理機能にアクセスできない
     @Test
     void getAllUsers_nonAdmin_should_return_403() throws Exception {
-        var loginReq = new LoginRequestDto("author@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("author@example.com", "password123");
 
         mockMvc.perform(get("/api/admin/users")
                 .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isForbidden());
     }
 
-    // ========== UserUpdateRequestDto を使った包括的な更新のテスト ==========
-
     // 管理者によるユーザー包括的更新成功は200
     @Test
     void updateUserByAdmin_comprehensive_should_return_200() throws Exception {
-        var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("admin@example.com", "password123");
 
         // まず作成
         String createEmail = "comprehensive" + System.currentTimeMillis() + "@example.com";
@@ -559,13 +614,7 @@ class UserControllerTest {
     // displayNameのみ更新は200
     @Test
     void updateUserByAdmin_displayNameOnly_should_return_200() throws Exception {
-        var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("admin@example.com", "password123");
 
         // 作成
         String createEmail = "displaynametest" + System.currentTimeMillis() + "@example.com";
@@ -601,13 +650,7 @@ class UserControllerTest {
     // ステータスとロールを同時に更新は200
     @Test
     void updateUserByAdmin_statusAndRole_should_return_200() throws Exception {
-        var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("admin@example.com", "password123");
 
         // 作成
         String createEmail = "statusroletest" + System.currentTimeMillis() + "@example.com";
@@ -643,13 +686,7 @@ class UserControllerTest {
     // パスワード更新は200
     @Test
     void updateUserByAdmin_password_should_return_200() throws Exception {
-        var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("admin@example.com", "password123");
 
         // 作成
         String createEmail = "passwordtest" + System.currentTimeMillis() + "@example.com";
@@ -692,13 +729,7 @@ class UserControllerTest {
     // メールアドレス重複での包括的更新は409
     @Test
     void updateUserByAdmin_duplicateEmail_should_return_409() throws Exception {
-        var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("admin@example.com", "password123");
 
         // 1つ目のユーザー作成
         String createEmail1 = "dupemail1-" + System.currentTimeMillis() + "@example.com";
@@ -744,13 +775,7 @@ class UserControllerTest {
     // 不正なロールでの包括的更新は400
     @Test
     void updateUserByAdmin_invalidRole_should_return_400() throws Exception {
-        var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("admin@example.com", "password123");
 
         // 作成
         String createEmail = "invalidroletest" + System.currentTimeMillis() + "@example.com";
@@ -784,13 +809,7 @@ class UserControllerTest {
     // bioが5000文字を超える場合のユーザー登録は400
     @Test
     void createUser_bioTooLong_should_return_400() throws Exception {
-        var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("admin@example.com", "password123");
 
         String longBio = "a".repeat(5001); // 5001文字
         var req = new UserRequestDto("test@example.com", "password123", "AUTHOR", "Test User", longBio, null);
@@ -806,13 +825,7 @@ class UserControllerTest {
     // bioとavatarMediaIdを同時に設定した正常作成は201
     @Test
     void createUser_withBioAndAvatar_should_return_201() throws Exception {
-        var loginReq = new LoginRequestDto("admin@example.com", "password123");
-        var loginRes = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(loginRes, "$.accessToken");
+        String accessToken = getAccessToken("admin@example.com", "password123");
 
         String uniqueEmail = "withbio" + System.currentTimeMillis() + "@example.com";
         var req = new UserRequestDto(uniqueEmail, "password123", "AUTHOR", "Test User", "This is a test bio", 1L);
@@ -826,5 +839,79 @@ class UserControllerTest {
                 .andReturn().getResponse().getContentAsString();
         Long userId = Long.valueOf((Integer) JsonPath.read(createRes, "$.id"));
         createdUserIds.add(userId);
+    }
+
+    // 自分のユーザー情報取得 (GET /api/admin/users/me)
+    @Test
+    void getMe_should_return_current_user() throws Exception {
+        String accessToken = getAccessToken("admin@example.com", "password123");
+
+        mockMvc.perform(get("/api/admin/users/me")
+                .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("admin@example.com"));
+    }
+
+    // 自分のプロフィール更新 (PUT /api/admin/users/me)
+    @Test
+    void updateMyProfile_should_update_displayName_and_bio() throws Exception {
+        String accessToken = getAccessToken("editor@example.com", "password123");
+
+        var updateDto = new com.example.backend.dto.user.UserProfileUpdateRequestDto("New Name", "New bio", null);
+
+        mockMvc.perform(put("/api/admin/users/me")
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateDto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.displayName").value("New Name"))
+                .andExpect(jsonPath("$.bio").value("New bio"));
+    }
+
+    // lastLoginAt がログイン時に更新されることを検証
+    @Test
+    void login_should_update_lastLoginAt() throws Exception {
+        String adminAccessToken = getAccessToken("admin@example.com", "password123");
+
+        // 新規ユーザーを作成 via admin
+        String uniqueEmail = "lastloginuser" + System.currentTimeMillis() + "@example.com";
+        String password = "password123";
+        var createReq = new UserRequestDto(uniqueEmail, password, "AUTHOR", "Last Login User", null, null);
+        var createRes = mockMvc.perform(post("/api/admin/users")
+                .header("Authorization", "Bearer " + adminAccessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createReq)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long userId = Long.valueOf((Integer) JsonPath.read(createRes, "$.id"));
+        createdUserIds.add(userId);
+
+        // 作成直後は lastLoginAt が null のはず
+        var before = userRepository.findById(userId);
+        assertTrue(before.isPresent());
+        assertNull(before.get().getLastLoginAt());
+
+        // 新規ユーザーでログイン
+        var newLoginReq = new LoginRequestDto(uniqueEmail, password);
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(newLoginReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").exists());
+
+        // ログイン後、lastLoginAt がセットされていること
+        var after = userRepository.findById(userId).orElseThrow();
+        assertNotNull(after.getLastLoginAt());
+    }
+
+    // ログインしてJWTトークンを取得するヘルパー
+    private String getAccessToken(String email, String password) throws Exception {
+        var loginReq = new LoginRequestDto(email, password);
+        var loginRes = mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return JsonPath.read(loginRes, "$.accessToken");
     }
 }

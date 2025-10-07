@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -37,6 +38,9 @@ public class S3MediaStorageService implements MediaStorage {
 
     @Override
     public PresignedUpload createUploadUrl(String storageKey, String contentType, long contentLength, Duration ttl) {
+        if (storageKey == null || storageKey.isBlank()) {
+            throw new IllegalArgumentException("storageKey must be provided");
+        }
         if (contentType == null || contentType.isBlank()) {
             throw new IllegalArgumentException("contentType must be provided");
         }
@@ -55,24 +59,34 @@ public class S3MediaStorageService implements MediaStorage {
                 .signatureDuration(ttl)
                 .build();
 
-        PresignedPutObjectRequest presigned = s3Presigner.presignPutObject(presignRequest);
+        try {
+            PresignedPutObjectRequest presigned = s3Presigner.presignPutObject(presignRequest);
 
-        Map<String, String> headers = Map.of("Content-Type", contentType);
-        Instant expiresAt = presigned.expiration() != null ? presigned.expiration() : Instant.now(clock).plus(ttl);
+            Map<String, String> headers = Map.of("Content-Type", contentType);
+            Instant expiresAt = presigned.expiration() != null ? presigned.expiration() : Instant.now(clock).plus(ttl);
 
-        return new PresignedUpload(presigned.url().toExternalForm(), headers, expiresAt, storageKey);
+            return new PresignedUpload(presigned.url().toExternalForm(), headers, expiresAt, storageKey);
+        } catch (S3Exception | SdkClientException e) {
+            throw new StorageException("Failed to create presigned upload URL", e);
+        }
     }
 
     @Override
     public PresignedDownload createDownloadUrl(String storageKey, Duration ttl) {
+        if (storageKey == null || storageKey.isBlank()) {
+            throw new IllegalArgumentException("storageKey must be provided");
+        }
         GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
                 .signatureDuration(ttl)
                 .getObjectRequest(b -> b.bucket(properties.getBucket()).key(storageKey).build())
                 .build();
-
-        PresignedGetObjectRequest presigned = s3Presigner.presignGetObject(presignRequest);
-        Instant expiresAt = presigned.expiration() != null ? presigned.expiration() : Instant.now(clock).plus(ttl);
-        return new PresignedDownload(presigned.url().toExternalForm(), expiresAt);
+        try {
+            PresignedGetObjectRequest presigned = s3Presigner.presignGetObject(presignRequest);
+            Instant expiresAt = presigned.expiration() != null ? presigned.expiration() : Instant.now(clock).plus(ttl);
+            return new PresignedDownload(presigned.url().toExternalForm(), expiresAt);
+        } catch (S3Exception | SdkClientException e) {
+            throw new StorageException("Failed to create presigned download URL", e);
+        }
     }
 
     @Override
@@ -107,6 +121,11 @@ public class S3MediaStorageService implements MediaStorage {
     }
 
     public static S3Client buildClient(MediaStorageProperties properties) {
+        if (properties == null)
+            throw new IllegalArgumentException("properties must not be null");
+        if (properties.getRegion() == null || properties.getRegion().isBlank()) {
+            throw new IllegalArgumentException("S3 region must be provided in MediaStorageProperties");
+        }
         S3ClientBuilder builder = S3Client.builder()
                 .region(Region.of(properties.getRegion()));
 
@@ -127,6 +146,11 @@ public class S3MediaStorageService implements MediaStorage {
     }
 
     public static S3Presigner buildPresigner(MediaStorageProperties properties) {
+        if (properties == null)
+            throw new IllegalArgumentException("properties must not be null");
+        if (properties.getRegion() == null || properties.getRegion().isBlank()) {
+            throw new IllegalArgumentException("S3 region must be provided in MediaStorageProperties");
+        }
         S3Presigner.Builder builder = S3Presigner.builder()
                 .region(Region.of(properties.getRegion()));
 
@@ -147,7 +171,7 @@ public class S3MediaStorageService implements MediaStorage {
         if (properties.getAccessKey() != null && properties.getSecretKey() != null) {
             AwsBasicCredentials basic = AwsBasicCredentials.create(properties.getAccessKey(),
                     properties.getSecretKey());
-            return () -> basic;
+            return StaticCredentialsProvider.create(basic);
         }
         return DefaultCredentialsProvider.create();
     }

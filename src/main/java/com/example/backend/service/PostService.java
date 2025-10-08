@@ -97,6 +97,9 @@ public class PostService {
 
     @Transactional
     public PostResponseDto create(PostRequestDto dto, User user) {
+        if (dto.getAuthorId() == null) {
+            throw new IllegalArgumentException("authorId is required for post creation");
+        }
         postPolicy.checkCreate(user.getRole(), dto.getAuthorId(), null, user.getId());
         Post post = new Post();
         postMapper.applyToEntity(post, dto);

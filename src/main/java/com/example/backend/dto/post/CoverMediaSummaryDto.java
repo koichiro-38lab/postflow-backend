@@ -9,6 +9,7 @@ import lombok.*;
 public class CoverMediaSummaryDto {
     private Long id;
     private String filename;
+    private String storageKey;
     private String mime;
     private Integer width;
     private Integer height;

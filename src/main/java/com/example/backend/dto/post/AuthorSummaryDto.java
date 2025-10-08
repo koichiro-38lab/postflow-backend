@@ -8,5 +8,5 @@ import lombok.*;
 @Builder
 public class AuthorSummaryDto {
     private Long id;
-    // private String name;
+    private String displayName;
 }

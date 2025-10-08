@@ -28,8 +28,7 @@ public class PostRequestDto {
     private String contentJson;
 
     private Long coverMediaId;
-    @NotNull
-    private Long authorId;
+    private Long authorId; // Optional: 新規作成時のみ必須、編集時は既存authorを保持
     private Long categoryId;
     private List<String> tags;
     private List<Long> tagIds;

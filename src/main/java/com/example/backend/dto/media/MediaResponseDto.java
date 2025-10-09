@@ -30,7 +30,7 @@ public class MediaResponseDto {
     @AllArgsConstructor
     public static class CreatedBySummary {
         private Long id;
-        private String email;
+        private String displayName;
         private String role;
     }
 }

@@ -19,7 +19,7 @@ public class MediaMapper {
                 .createdAt(media.getCreatedAt())
                 .createdBy(MediaResponseDto.CreatedBySummary.builder()
                         .id(media.getCreatedBy().getId())
-                        .email(media.getCreatedBy().getEmail())
+                        .displayName(media.getCreatedBy().getDisplayName())
                         .role(media.getCreatedBy().getRole().name())
                         .build())
                 .build();

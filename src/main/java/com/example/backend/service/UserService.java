@@ -9,6 +9,7 @@ import com.example.backend.dto.user.UserUpdateRequestDto;
 import com.example.backend.entity.Media;
 import com.example.backend.entity.User;
 import com.example.backend.entity.UserStatus;
+import com.example.backend.exception.AccessDeniedException;
 import com.example.backend.exception.UserNotFoundException;
 import com.example.backend.exception.DuplicateEmailException;
 import com.example.backend.exception.MediaNotFoundException;
@@ -111,16 +112,24 @@ public class UserService {
 
     // 管理者によるユーザー更新
     @Transactional
-    public UserResponseDto updateUserByAdmin(Long id, UserUpdateRequestDto dto) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new UserNotFoundException("User not found"));
+    public UserResponseDto updateUserByAdmin(Long userId, UserUpdateRequestDto dto, User currentUser) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("User not found with id: " + userId));
+
+        // 自分自身のロール・ステータス変更をチェック
+        if (userId.equals(currentUser.getId())) {
+            if (dto.role() != null) {
+                throw new AccessDeniedException("Cannot change your own role");
+            }
+            if (dto.status() != null) {
+                throw new AccessDeniedException("Cannot change your own status");
+            }
+        }
 
         // メールアドレスが変更されていて、かつ既に存在する場合
         if (dto.email() != null && !user.getEmail().equals(dto.email()) && userRepository.existsByEmail(dto.email())) {
             throw new DuplicateEmailException("Email already exists");
-        }
-
-        // メールアドレス更新
+        }        // メールアドレス更新
         if (dto.email() != null) {
             user.setEmail(dto.email());
         }
@@ -224,13 +233,14 @@ public class UserService {
     // ユーザー一覧取得（ページング、ステータスフィルタ対応）
     public Page<UserResponseDto> findAllWithPagination(Pageable pageable, UserStatus status, User.Role role) {
         Page<User> users;
-        if (status != null) {
+        if (status != null && role != null) {
+            users = userRepository.findByStatusAndRole(status, role, pageable);
+        } else if (status != null) {
             users = userRepository.findByStatus(status, pageable);
+        } else if (role != null) {
+            users = userRepository.findByRole(role, pageable);
         } else {
             users = userRepository.findAll(pageable);
-        }
-        if (role != null) {
-            users = userRepository.findByRole(role, pageable);
         }
         return users.map(UserMapper::toResponseDto);
     }

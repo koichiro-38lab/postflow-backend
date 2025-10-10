@@ -806,6 +806,60 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.messages[0].field").value("error"));
     }
 
+    // 自分自身のロール変更は403
+    @Test
+    void updateUserByAdmin_changeOwnRole_should_return_403() throws Exception {
+        String accessToken = getAccessToken("admin@example.com", "password123");
+        Long adminId = userRepository.findByEmail("admin@example.com")
+                .map(User::getId)
+                .orElseThrow();
+
+        var updateReq = new UserUpdateRequestDto(
+                null,
+                null,
+                null,
+                null,
+                null,
+                "EDITOR",
+                null);
+
+        mockMvc.perform(put("/api/admin/users/" + adminId)
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateReq)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.messages[0].code").value("error.access.denied"));
+
+        assertEquals(User.Role.ADMIN, userRepository.findById(adminId).orElseThrow().getRole());
+    }
+
+    // 自分自身のステータス変更は403
+    @Test
+    void updateUserByAdmin_changeOwnStatus_should_return_403() throws Exception {
+        String accessToken = getAccessToken("admin@example.com", "password123");
+        Long adminId = userRepository.findByEmail("admin@example.com")
+                .map(User::getId)
+                .orElseThrow();
+
+        var updateReq = new UserUpdateRequestDto(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                UserStatus.SUSPENDED);
+
+        mockMvc.perform(put("/api/admin/users/" + adminId)
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateReq)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.messages[0].code").value("error.access.denied"));
+
+        assertEquals(UserStatus.ACTIVE, userRepository.findById(adminId).orElseThrow().getStatus());
+    }
+
     // bioが5000文字を超える場合のユーザー登録は400
     @Test
     void createUser_bioTooLong_should_return_400() throws Exception {

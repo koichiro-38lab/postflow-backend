@@ -76,14 +76,17 @@ public class UserController {
     }
 
     /**
-     * ユーザー情報更新
+     * ユーザー情報更新（管理者用）
      * PUT /api/admin/users/{id}
      */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<UserResponseDto> updateUser(@PathVariable Long id,
+    public ResponseEntity<UserResponseDto> updateUser(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long id,
             @Valid @RequestBody UserUpdateRequestDto dto) {
-        UserResponseDto user = userService.updateUserByAdmin(id, dto);
+        var currentUser = userService.getCurrentUser(jwt);
+        UserResponseDto user = userService.updateUserByAdmin(id, dto, currentUser);
         return ResponseEntity.ok(user);
     }
 

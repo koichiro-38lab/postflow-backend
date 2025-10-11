@@ -9,12 +9,12 @@ import com.example.backend.dto.user.UserUpdateRequestDto;
 import com.example.backend.entity.Media;
 import com.example.backend.entity.User;
 import com.example.backend.entity.UserStatus;
-import com.example.backend.exception.AccessDeniedException;
 import com.example.backend.exception.UserNotFoundException;
 import com.example.backend.exception.DuplicateEmailException;
 import com.example.backend.exception.MediaNotFoundException;
 import com.example.backend.repository.MediaRepository;
 import com.example.backend.repository.UserRepository;
+import com.example.backend.security.UserPolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -43,10 +43,14 @@ public class UserService {
     private final UserRepository userRepository;
     private final MediaRepository mediaRepository;
     private final PasswordEncoder passwordEncoder;
+    private final UserPolicy userPolicy;
 
     // ユーザー作成（旧: 管理画面からの作成時のみ使用）
     @Transactional
-    public UserResponseDto createUser(UserRequestDto dto) {
+    public UserResponseDto createUser(UserRequestDto dto, User currentUser) {
+        // 権限チェック（管理者のみユーザー作成可能）
+        userPolicy.checkManageUsers(currentUser);
+
         if (userRepository.existsByEmail(dto.email())) {
             throw new DuplicateEmailException("Email already exists");
         }
@@ -76,10 +80,13 @@ public class UserService {
     }
 
     // IDでユーザー取得
-    public UserResponseDto getUserById(Long id) {
-        return userRepository.findById(id)
-                .map(UserMapper::toResponseDto)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+    public UserResponseDto getUserById(Long id, User currentUser) {
+        // 権限チェック（管理者のみ他人のユーザー情報取得可能）
+        User targetUser = userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+        userPolicy.checkViewProfile(currentUser, targetUser);
+
+        return UserMapper.toResponseDto(targetUser);
     }
 
     // 更新（旧: 作成時のみ使用）
@@ -116,20 +123,20 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("User not found with id: " + userId));
 
-        // 自分自身のロール・ステータス変更をチェック
-        if (userId.equals(currentUser.getId())) {
-            if (dto.role() != null) {
-                throw new AccessDeniedException("Cannot change your own role");
-            }
-            if (dto.status() != null) {
-                throw new AccessDeniedException("Cannot change your own status");
-            }
+        // ロール変更の権限チェック
+        if (dto.role() != null) {
+            userPolicy.checkChangeUserRole(currentUser, user);
+        }
+
+        // ステータス変更の権限チェック
+        if (dto.status() != null) {
+            userPolicy.checkChangeUserStatus(currentUser, user);
         }
 
         // メールアドレスが変更されていて、かつ既に存在する場合
         if (dto.email() != null && !user.getEmail().equals(dto.email()) && userRepository.existsByEmail(dto.email())) {
             throw new DuplicateEmailException("Email already exists");
-        }        // メールアドレス更新
+        } // メールアドレス更新
         if (dto.email() != null) {
             user.setEmail(dto.email());
         }
@@ -205,6 +212,9 @@ public class UserService {
         User user = userRepository.findById(currentUser.getId())
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
 
+        // 権限チェック（自分自身のプロフィールのみ更新可能）
+        userPolicy.checkUpdateProfile(currentUser, user);
+
         // プロフィール情報の更新
         UserMapper.applyProfileUpdate(user, dto);
 
@@ -231,7 +241,11 @@ public class UserService {
     // ========== 管理者用ユーザー管理 ==========
 
     // ユーザー一覧取得（ページング、ステータスフィルタ対応）
-    public Page<UserResponseDto> findAllWithPagination(Pageable pageable, UserStatus status, User.Role role) {
+    public Page<UserResponseDto> findAllWithPagination(Pageable pageable, UserStatus status, User.Role role,
+            User currentUser) {
+        // 権限チェック（管理者のみユーザー一覧を取得可能）
+        userPolicy.checkManageUsers(currentUser);
+
         Page<User> users;
         if (status != null && role != null) {
             users = userRepository.findByStatusAndRole(status, role, pageable);
@@ -247,9 +261,13 @@ public class UserService {
 
     // ユーザーステータス変更
     @Transactional
-    public UserResponseDto updateUserStatus(Long userId, UserStatus status) {
+    public UserResponseDto updateUserStatus(Long userId, UserStatus status, User currentUser) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        // 権限チェック
+        userPolicy.checkChangeUserStatus(currentUser, user);
+
         user.setStatus(status);
         User updated = userRepository.save(user);
         return UserMapper.toResponseDto(updated);
@@ -257,9 +275,13 @@ public class UserService {
 
     // ユーザーロール変更
     @Transactional
-    public UserResponseDto updateUserRole(Long userId, User.Role role) {
+    public UserResponseDto updateUserRole(Long userId, User.Role role, User currentUser) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        // 権限チェック
+        userPolicy.checkChangeUserRole(currentUser, user);
+
         user.setRole(role);
         User updated = userRepository.save(user);
         return UserMapper.toResponseDto(updated);
@@ -267,9 +289,18 @@ public class UserService {
 
     // ユーザー削除
     @Transactional
-    public void deleteUser(Long userId) {
+    public void deleteUser(Long userId, User currentUser) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        // 権限チェック（管理者のみ削除可能）
+        userPolicy.checkManageUsers(currentUser);
+
+        // 自分自身の削除を防止
+        if (userId.equals(currentUser.getId())) {
+            throw new IllegalArgumentException("Cannot delete your own account");
+        }
+
         userRepository.delete(user);
     }
 }

@@ -39,8 +39,11 @@ public class UserController {
      */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<UserResponseDto> createUser(@Valid @RequestBody UserRequestDto dto) {
-        UserResponseDto user = userService.createUser(dto);
+    public ResponseEntity<UserResponseDto> createUser(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody UserRequestDto dto) {
+        var currentUser = userService.getCurrentUser(jwt);
+        UserResponseDto user = userService.createUser(dto, currentUser);
         return ResponseEntity.status(HttpStatus.CREATED).body(user);
     }
 
@@ -56,8 +59,7 @@ public class UserController {
             @RequestParam(required = false) UserStatus status,
             @RequestParam(required = false) User.Role role) { // ロールパラメータを追加
         var currentUser = userService.getCurrentUser(jwt);
-        userPolicy.checkManageUsers(currentUser);
-        Page<UserResponseDto> users = userService.findAllWithPagination(pageable, status, role); // role を渡す
+        Page<UserResponseDto> users = userService.findAllWithPagination(pageable, status, role, currentUser);
         return ResponseEntity.ok(users);
     }
 
@@ -71,8 +73,7 @@ public class UserController {
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable Long id) {
         var currentUser = userService.getCurrentUser(jwt);
-        userPolicy.checkManageUsers(currentUser);
-        return ResponseEntity.ok(userService.getUserById(id));
+        return ResponseEntity.ok(userService.getUserById(id, currentUser));
     }
 
     /**
@@ -101,11 +102,7 @@ public class UserController {
             @PathVariable Long id,
             @Valid @RequestBody UserStatusUpdateRequestDto dto) {
         var currentUser = userService.getCurrentUser(jwt);
-        var targetUser = userService.getUserById(id);
-        // 権限チェック（ADMIN のみ、自分以外）
-        userPolicy.checkChangeUserStatus(currentUser,
-                User.builder().id(targetUser.id()).build());
-        var updated = userService.updateUserStatus(id, dto.status());
+        var updated = userService.updateUserStatus(id, dto.status(), currentUser);
         return ResponseEntity.ok(updated);
     }
 
@@ -120,11 +117,7 @@ public class UserController {
             @PathVariable Long id,
             @Valid @RequestBody UserRoleUpdateRequestDto dto) {
         var currentUser = userService.getCurrentUser(jwt);
-        var targetUser = userService.getUserById(id);
-        // 権限チェック（ADMIN のみ、自分以外）
-        userPolicy.checkChangeUserRole(currentUser,
-                User.builder().id(targetUser.id()).build());
-        var updated = userService.updateUserRole(id, dto.role());
+        var updated = userService.updateUserRole(id, dto.role(), currentUser);
         return ResponseEntity.ok(updated);
     }
 
@@ -138,12 +131,7 @@ public class UserController {
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable Long id) {
         var currentUser = userService.getCurrentUser(jwt);
-        var targetUser = userService.getUserById(id);
-        // 権限チェック（ADMIN のみ、自分以外）
-        userPolicy.checkManageUsers(currentUser);
-        userPolicy.checkChangeUserStatus(currentUser,
-                User.builder().id(targetUser.id()).build());
-        userService.deleteUser(id);
+        userService.deleteUser(id, currentUser);
         return ResponseEntity.noContent().build();
     }
 

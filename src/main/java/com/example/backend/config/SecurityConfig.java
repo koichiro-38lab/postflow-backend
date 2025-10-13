@@ -40,12 +40,16 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/api/public/**").permitAll() // 公開APIは認証不要
                         .requestMatchers("/api/admin/**").authenticated()
                         .requestMatchers("/api/**").permitAll()
                         .anyRequest().authenticated())
                 // Authorization: Bearer <token> を検証
                 .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
+                // Rate Limitingフィルタを追加
+                .addFilterBefore(new RateLimitFilter(),
+                        org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 

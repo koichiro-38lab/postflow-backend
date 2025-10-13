@@ -1,0 +1,23 @@
+### 公開API: 投稿一覧取得
+GET http://localhost:8100/api/public/posts
+Accept: application/json
+
+### 公開API: 投稿一覧取得（ページング）
+GET http://localhost:8100/api/public/posts?page=0&size=5
+Accept: application/json
+
+### 公開API: 投稿一覧取得（タグフィルタ）
+GET http://localhost:8100/api/public/posts?tag=java
+Accept: application/json
+
+### 公開API: 投稿詳細取得（スラッグ指定）
+GET http://localhost:8100/api/public/posts/test-post-slug
+Accept: application/json
+
+### 公開API: タグ一覧取得
+GET http://localhost:8100/api/public/tags
+Accept: application/json
+
+### 公開API: カテゴリ一覧取得
+GET http://localhost:8100/api/public/categories
+Accept: application/json

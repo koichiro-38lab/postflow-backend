@@ -9,4 +9,6 @@ import lombok.*;
 public class AuthorSummaryDto {
     private Long id;
     private String displayName;
+    private String avatarUrl;
+    private String bio;
 }

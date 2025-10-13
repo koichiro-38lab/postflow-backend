@@ -43,4 +43,13 @@ public class CategoryMapper {
         category.setSlug(dto.slug());
         // parentはServiceで設定
     }
+
+    // 公開API用: シンプルなDTO変換
+    public CategoryPublicResponseDto toPublicResponseDto(Category category) {
+        return CategoryPublicResponseDto.builder()
+                .id(category.getId())
+                .name(category.getName())
+                .slug(category.getSlug())
+                .build();
+    }
 }

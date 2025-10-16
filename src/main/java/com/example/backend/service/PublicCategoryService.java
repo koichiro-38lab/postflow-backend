@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -26,12 +27,13 @@ public class PublicCategoryService {
     /**
      * 公開投稿に紐づくカテゴリ一覧を取得
      * 
-     * @return 公開カテゴリのリスト
+     * @return 公開カテゴリのリスト（sort_order昇順）
      */
     public List<CategoryPublicResponseDto> getPublicCategories() {
         LocalDateTime now = LocalDateTime.now(clock);
         return categoryRepository.findPublicCategories(now).stream()
                 .map(categoryMapper::toPublicResponseDto)
+                .sorted(Comparator.comparing(CategoryPublicResponseDto::getSortOrder))
                 .toList();
     }
 }

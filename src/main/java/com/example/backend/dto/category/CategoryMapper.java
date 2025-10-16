@@ -50,6 +50,8 @@ public class CategoryMapper {
                 .id(category.getId())
                 .name(category.getName())
                 .slug(category.getSlug())
+                .parentId(category.getParent() != null ? category.getParent().getId() : null)
+                .sortOrder(category.getSortOrder())
                 .build();
     }
 }

@@ -36,7 +36,8 @@ public class PublicPostService {
      * @param categorySlug カテゴリスラッグ（フィルタ用、null可）
      * @return 公開投稿のページ
      */
-    public Page<PostPublicResponseDto> getPublicPosts(Pageable pageable, String tagSlug, String categorySlug) {
+    public Page<PostPublicResponseDto> getPublicPosts(Pageable pageable, String tagSlug, String categorySlug,
+            String categoriesCsv) {
         LocalDateTime now = LocalDateTime.now(clock);
 
         Specification<Post> spec = (root, query, cb) -> cb.equal(root.get("status"), Post.Status.PUBLISHED);
@@ -46,7 +47,11 @@ public class PublicPostService {
             spec = spec.and((root, query, cb) -> cb.equal(root.join("tags").get("slug"), tagSlug));
         }
 
-        if (categorySlug != null && !categorySlug.isBlank()) {
+        // category または categories パラメータでフィルタ
+        if (categoriesCsv != null && !categoriesCsv.isBlank()) {
+            String[] slugs = categoriesCsv.split(",");
+            spec = spec.and((root, query, cb) -> root.join("category").get("slug").in((Object[]) slugs));
+        } else if (categorySlug != null && !categorySlug.isBlank()) {
             spec = spec.and((root, query, cb) -> cb.equal(root.join("category").get("slug"), categorySlug));
         }
 

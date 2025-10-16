@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
 public class TagRequestDto {
     @NotBlank
     @Size(min = 1, max = 255)
-    @Pattern(regexp = "^[A-Za-z0-9-]+$", message = "Tag name must be alphanumeric or hyphen (A-Za-z0-9-)")
+    @Pattern(regexp = "^[\\w\\u3040-\\u309F\\u30A0-\\u30FF\\u4E00-\\u9FFF\\uAC00-\\uD7AF\\uFF00-\\uFFEF\\s\\p{Punct}/]+$", message = "Tag name contains invalid characters")
     private String name;
 
     @NotBlank

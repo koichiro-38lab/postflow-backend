@@ -34,8 +34,9 @@ public class PublicPostController {
     public ResponseEntity<Page<PostPublicResponseDto>> getPosts(
             @PageableDefault(size = 10, sort = "publishedAt", direction = Sort.Direction.DESC) Pageable pageable,
             @RequestParam(required = false) String tag,
-            @RequestParam(required = false) String category) {
-        return ResponseEntity.ok(publicPostService.getPublicPosts(pageable, tag, category));
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String categories) {
+        return ResponseEntity.ok(publicPostService.getPublicPosts(pageable, tag, category, categories));
     }
 
     /**

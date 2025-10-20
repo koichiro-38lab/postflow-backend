@@ -45,7 +45,13 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final UserPolicy userPolicy;
 
-    // ユーザー作成（旧: 管理画面からの作成時のみ使用）
+    /**
+     * ユーザー作成
+     * 
+     * @param dto
+     * @param currentUser
+     * @return
+     */
     @Transactional
     public UserResponseDto createUser(UserRequestDto dto, User currentUser) {
         // 権限チェック（管理者のみユーザー作成可能）
@@ -71,7 +77,11 @@ public class UserService {
         return UserMapper.toResponseDto(saved);
     }
 
-    // 全ユーザー取得
+    /**
+     * 全ユーザー取得（管理者用）
+     * 
+     * @return
+     */
     public List<UserResponseDto> getAllUsers() {
         return userRepository.findAll(Sort.by(Sort.Direction.ASC, "id"))
                 .stream()
@@ -89,7 +99,13 @@ public class UserService {
         return UserMapper.toResponseDto(targetUser);
     }
 
-    // 更新（旧: 作成時のみ使用）
+    /**
+     * ユーザー更新
+     * 
+     * @param id
+     * @param dto
+     * @return
+     */
     @Transactional
     public UserResponseDto updateUser(Long id, UserRequestDto dto) {
         User user = userRepository.findById(id)
@@ -117,7 +133,14 @@ public class UserService {
         return UserMapper.toResponseDto(updated);
     }
 
-    // 管理者によるユーザー更新
+    /**
+     * 管理者によるユーザー更新
+     * 
+     * @param userId
+     * @param dto
+     * @param currentUser
+     * @return
+     */
     @Transactional
     public UserResponseDto updateUserByAdmin(Long userId, UserUpdateRequestDto dto, User currentUser) {
         User user = userRepository.findById(userId)
@@ -196,9 +219,12 @@ public class UserService {
         }
     }
 
-    // ========== プロフィール管理 ==========
-
-    // 自分のプロフィール取得
+    /**
+     * 自分のプロフィール取得
+     * 
+     * @param currentUser
+     * @return
+     */
     public UserProfileResponseDto getMyProfile(User currentUser) {
         // 最新の情報を取得（リレーションも含む）
         User user = userRepository.findById(currentUser.getId())
@@ -206,7 +232,13 @@ public class UserService {
         return UserMapper.toProfileResponseDto(user);
     }
 
-    // 自分のプロフィール更新
+    /**
+     * 自分のプロフィール更新
+     * 
+     * @param currentUser
+     * @param dto
+     * @return
+     */
     @Transactional
     public UserProfileResponseDto updateMyProfile(User currentUser, UserProfileUpdateRequestDto dto) {
         User user = userRepository.findById(currentUser.getId())
@@ -231,16 +263,26 @@ public class UserService {
         return UserMapper.toProfileResponseDto(updated);
     }
 
-    // ログイン成功時の最終ログイン日時更新
+    /**
+     * 最終ログイン日時の更新
+     * 
+     * @param user
+     */
     @Transactional
     public void updateLastLoginAt(User user) {
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
     }
 
-    // ========== 管理者用ユーザー管理 ==========
-
-    // ユーザー一覧取得（ページング、ステータスフィルタ対応）
+    /**
+     * ページネーション付きで全ユーザー取得（管理者用）
+     * 
+     * @param pageable
+     * @param status
+     * @param role
+     * @param currentUser
+     * @return
+     */
     public Page<UserResponseDto> findAllWithPagination(Pageable pageable, UserStatus status, User.Role role,
             User currentUser) {
         // 権限チェック（管理者のみユーザー一覧を取得可能）
@@ -259,7 +301,14 @@ public class UserService {
         return users.map(UserMapper::toResponseDto);
     }
 
-    // ユーザーステータス変更
+    /**
+     * ユーザーステータス変更
+     * 
+     * @param userId
+     * @param status
+     * @param currentUser
+     * @return
+     */
     @Transactional
     public UserResponseDto updateUserStatus(Long userId, UserStatus status, User currentUser) {
         User user = userRepository.findById(userId)
@@ -273,7 +322,14 @@ public class UserService {
         return UserMapper.toResponseDto(updated);
     }
 
-    // ユーザーロール変更
+    /**
+     * ユーザーロール変更
+     * 
+     * @param userId
+     * @param role
+     * @param currentUser
+     * @return
+     */
     @Transactional
     public UserResponseDto updateUserRole(Long userId, User.Role role, User currentUser) {
         User user = userRepository.findById(userId)
@@ -287,7 +343,12 @@ public class UserService {
         return UserMapper.toResponseDto(updated);
     }
 
-    // ユーザー削除
+    /**
+     * ユーザー削除
+     * 
+     * @param userId
+     * @param currentUser
+     */
     @Transactional
     public void deleteUser(Long userId, User currentUser) {
         User user = userRepository.findById(userId)

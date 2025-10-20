@@ -25,6 +25,18 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * 管理画面用ユーザーAPIコントローラー。
+ * <p>
+ * ユーザーの作成・一覧・詳細・更新・削除・ロール/ステータス変更・自身プロフィール取得/更新を提供。全エンドポイントで認証・RBAC制御を行う。
+ * <ul>
+ * <li>管理者のみ: 作成・一覧・詳細・更新・削除・ロール/ステータス変更</li>
+ * <li>全認証ユーザー: 自身のプロフィール取得・更新</li>
+ * </ul>
+ * 
+ * @see com.example.backend.service.UserService
+ * @see com.example.backend.security.UserPolicy
+ */
 @RestController
 @RequestMapping("/api/admin/users")
 @RequiredArgsConstructor
@@ -34,8 +46,16 @@ public class UserController {
     private final UserPolicy userPolicy;
 
     /**
-     * ユーザー作成
-     * POST /api/admin/users
+     * ユーザーを新規作成。
+     * <p>
+     * 管理者のみ利用可能。
+     * </p>
+     * 
+     * @param jwt JWT認証情報
+     * @param dto ユーザー作成情報
+     * @return 作成されたユーザー詳細
+     * @throws com.example.backend.exception.AccessDeniedException          権限不足
+     * @throws org.springframework.web.bind.MethodArgumentNotValidException バリデーションエラー
      */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
@@ -48,8 +68,17 @@ public class UserController {
     }
 
     /**
-     * ユーザー一覧取得（ページング、ステータスフィルタ対応）
-     * GET /api/admin/users?page=0&size=20&status=ACTIVE&role=ADMIN
+     * 全ユーザーをページング取得。
+     * <p>
+     * 管理者のみ利用可能。ステータス・ロールでフィルタ可能。
+     * </p>
+     * 
+     * @param jwt      JWT認証情報
+     * @param pageable ページング情報
+     * @param status   ユーザーステータス（任意）
+     * @param role     ユーザーロール（任意）
+     * @return ユーザー一覧ページ
+     * @throws com.example.backend.exception.AccessDeniedException 権限不足
      */
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
@@ -64,8 +93,15 @@ public class UserController {
     }
 
     /**
-     * ユーザー詳細取得
-     * GET /api/admin/users/{id}
+     * ユーザー詳細を取得。
+     * <p>
+     * 管理者のみ利用可能。存在しない場合は404。
+     * </p>
+     * 
+     * @param jwt JWT認証情報
+     * @param id  ユーザーID
+     * @return ユーザー詳細
+     * @throws com.example.backend.exception.AccessDeniedException 権限不足
      */
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
@@ -77,8 +113,17 @@ public class UserController {
     }
 
     /**
-     * ユーザー情報更新（管理者用）
-     * PUT /api/admin/users/{id}
+     * ユーザー情報を更新。
+     * <p>
+     * 管理者のみ利用可能。存在しない場合は404。
+     * </p>
+     * 
+     * @param jwt JWT認証情報
+     * @param id  ユーザーID
+     * @param dto ユーザー更新情報
+     * @return 更新されたユーザー詳細
+     * @throws com.example.backend.exception.AccessDeniedException          権限不足
+     * @throws org.springframework.web.bind.MethodArgumentNotValidException バリデーションエラー
      */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
@@ -92,8 +137,17 @@ public class UserController {
     }
 
     /**
-     * ユーザーステータス変更
-     * PATCH /api/admin/users/{id}/status
+     * ユーザーステータスを変更。
+     * <p>
+     * 管理者のみ利用可能。存在しない場合は404。
+     * </p>
+     * 
+     * @param jwt JWT認証情報
+     * @param id  ユーザーID
+     * @param dto ユーザーステータス更新情報
+     * @return 更新されたユーザー詳細
+     * @throws com.example.backend.exception.AccessDeniedException          権限不足
+     * @throws org.springframework.web.bind.MethodArgumentNotValidException バリデーションエラー
      */
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
@@ -107,8 +161,17 @@ public class UserController {
     }
 
     /**
-     * ユーザーロール変更
-     * PATCH /api/admin/users/{id}/role
+     * ユーザーロールを変更。
+     * <p>
+     * 管理者のみ利用可能。存在しない場合は404。
+     * </p>
+     * 
+     * @param jwt JWT認証情報
+     * @param id  ユーザーID
+     * @param dto ユーザーロール更新情報
+     * @return 更新されたユーザー詳細
+     * @throws com.example.backend.exception.AccessDeniedException          権限不足
+     * @throws org.springframework.web.bind.MethodArgumentNotValidException バリデーションエラー
      */
     @PatchMapping("/{id}/role")
     @PreAuthorize("hasRole('ADMIN')")
@@ -122,8 +185,15 @@ public class UserController {
     }
 
     /**
-     * ユーザー削除
-     * DELETE /api/admin/users/{id}
+     * ユーザーを削除。
+     * <p>
+     * 管理者のみ利用可能。存在しない場合は404。
+     * </p>
+     * 
+     * @param jwt JWT認証情報
+     * @param id  ユーザーID
+     * @return 204 No Content
+     * @throws com.example.backend.exception.AccessDeniedException 権限不足
      */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
@@ -136,8 +206,14 @@ public class UserController {
     }
 
     /**
-     * 自分のユーザー情報取得
-     * GET /api/admin/users/me
+     * 自分のユーザー情報を取得。
+     * <p>
+     * 全認証ユーザーが利用可能。
+     * </p>
+     * 
+     * @param jwt JWT認証情報
+     * @return 自分のユーザー情報
+     * @throws com.example.backend.exception.AccessDeniedException 認証失敗時
      */
     @GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
@@ -148,8 +224,16 @@ public class UserController {
     }
 
     /**
-     * 自分のプロフィール更新
-     * PUT /api/admin/users/me
+     * 自分のプロフィールを更新。
+     * <p>
+     * 全認証ユーザーが利用可能。自分自身のみ更新可能。
+     * </p>
+     * 
+     * @param jwt JWT認証情報
+     * @param dto プロフィール更新情報
+     * @return 更新されたプロフィール情報
+     * @throws com.example.backend.exception.AccessDeniedException          権限不足
+     * @throws org.springframework.web.bind.MethodArgumentNotValidException バリデーションエラー
      */
     @PutMapping("/me")
     @PreAuthorize("isAuthenticated()")

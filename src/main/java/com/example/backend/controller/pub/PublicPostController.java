@@ -12,7 +12,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * 公開API: 投稿エンドポイント（認証不要）
+ * 公開投稿APIコントローラー。
+ * <p>
+ * 認証不要で公開投稿の一覧・詳細取得が可能。
+ * </p>
+ * 
+ * @see com.example.backend.service.PublicPostService
  */
 @RestController
 @RequestMapping("/api/public/posts")
@@ -22,12 +27,15 @@ public class PublicPostController {
     private final PublicPostService publicPostService;
 
     /**
-     * 公開投稿一覧を取得
-     * GET /api/public/posts?page=0&size=10&tag=spring&category=tech
+     * 公開投稿一覧を取得。
+     * <p>
+     * 認証不要。タグ・カテゴリでフィルタ可能。ページング対応。
+     * </p>
      * 
-     * @param pageable ページング情報（デフォルト: publishedAt DESC）
-     * @param tag      タグスラッグ（オプション）
-     * @param category カテゴリスラッグ（オプション）
+     * @param pageable   ページング情報（デフォルト: publishedAt DESC）
+     * @param tag        タグスラッグ（任意）
+     * @param category   カテゴリスラッグ（任意）
+     * @param categories カテゴリスラッグ複数（任意, カンマ区切り）
      * @return 公開投稿のページ
      */
     @GetMapping
@@ -40,8 +48,10 @@ public class PublicPostController {
     }
 
     /**
-     * スラッグによる公開投稿詳細を取得
-     * GET /api/public/posts/{slug}
+     * スラッグ指定で公開投稿詳細を取得。
+     * <p>
+     * 認証不要。存在しない場合は404。
+     * </p>
      * 
      * @param slug 投稿スラッグ
      * @return 投稿詳細（SEO/OGP情報含む）

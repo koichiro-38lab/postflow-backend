@@ -16,6 +16,18 @@ import java.util.Objects;
 import javax.crypto.SecretKey;
 import org.springframework.stereotype.Service;
 
+/**
+ * JWTトークン発行・検証サービス。
+ * <p>
+ * アクセストークン・リフレッシュトークンの発行、検証、署名キー管理を提供。
+ * <ul>
+ * <li>トークン発行: subject/roles/有効期限付きJWT生成</li>
+ * <li>検証: 署名・有効期限・クレーム検証</li>
+ * <li>署名キー: HS256固定、キャッシュ付き</li>
+ * </ul>
+ * 
+ * @see com.example.backend.config.JwtProperties
+ */
 @Service
 public class JwtTokenService {
     public static final String ROLES_CLAIM = "roles";
@@ -32,20 +44,60 @@ public class JwtTokenService {
     public record TokenPair(String accessToken, String refreshToken) {
     }
 
+    /**
+     * アクセストークンを発行。
+     * <p>
+     * subject/roles/有効期限付きのJWTをHS256署名で生成。
+     * </p>
+     * 
+     * @param subject トークンのサブジェクト
+     * @param roles   ユーザーのロール
+     * @return 署名済みのアクセストークン文字列
+     */
     public String generateAccessToken(String subject, Collection<String> roles) {
         return generateToken(subject, roles, props.getAccessTtl().toSeconds());
     }
 
+    /**
+     * リフレッシュトークンを発行。
+     * <p>
+     * subject/有効期限付きのJWTをHS256署名で生成。
+     * </p>
+     * 
+     * @param subject トークンのサブジェクト
+     * @return 署名済みのリフレッシュトークン文字列
+     */
     public String generateRefreshToken(String subject) {
         return generateToken(subject, List.of(), props.getRefreshTtl().toSeconds());
     }
 
+    /**
+     * アクセストークン・リフレッシュトークンのペアを発行。
+     * <p>
+     * subject/rolesを元に両トークンを同時発行。
+     * </p>
+     * 
+     * @param subject トークンのサブジェクト
+     * @param roles   ユーザーのロール
+     * @return 署名済みのアクセストークン・リフレッシュトークンペア
+     */
     public TokenPair issueTokens(String subject, Collection<String> roles) {
         String access = generateAccessToken(subject, roles);
         String refresh = generateRefreshToken(subject);
         return new TokenPair(access, refresh);
     }
 
+    /**
+     * トークンを検証・解析。
+     * <p>
+     * 署名・有効期限・クレームを検証し、VerifiedTokenを返却。
+     * </p>
+     * 
+     * @param token 署名済みのトークン文字列
+     * @return 検証済みトークン情報
+     * @throws io.jsonwebtoken.security.SecurityException 署名不正時
+     * @throws io.jsonwebtoken.ExpiredJwtException        有効期限切れ時
+     */
     public VerifiedToken verify(String token) {
         Jws<Claims> claimsJws = Jwts.parser()
                 .verifyWith(signingKey())
@@ -63,6 +115,12 @@ public class JwtTokenService {
         return new VerifiedToken(subject, roles, issuedAt, expiresAt, claims);
     }
 
+    /**
+     * 検証済みトークン情報。
+     * <p>
+     * subject/roles/発行・有効期限/全クレームを保持。
+     * </p>
+     */
     public record VerifiedToken(
             String subject,
             List<String> roles,
@@ -71,6 +129,17 @@ public class JwtTokenService {
             Map<String, Object> claims) {
     }
 
+    /**
+     * トークンを生成。
+     * <p>
+     * subject/roles/有効期限付きJWTをHS256署名で生成。
+     * </p>
+     * 
+     * @param subject    トークンのサブジェクト
+     * @param roles      ユーザーのロール
+     * @param ttlSeconds 有効期限（秒）
+     * @return 署名済みのトークン文字列
+     */
     private String generateToken(String subject, Collection<String> roles, long ttlSeconds) {
         var now = Instant.now(clock);
         var exp = now.plusSeconds(ttlSeconds);
@@ -89,6 +158,15 @@ public class JwtTokenService {
                 .compact();
     }
 
+    /**
+     * 署名キーを取得（キャッシュ付き）。
+     * <p>
+     * JWTのHS256署名に利用。app.jwt.secretが未設定の場合は例外。
+     * </p>
+     * 
+     * @return 署名用SecretKey
+     * @throws IllegalStateException シークレット未設定時
+     */
     private SecretKey signingKey() {
         SecretKey key = cachedKey;
         if (key != null)

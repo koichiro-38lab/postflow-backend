@@ -25,6 +25,19 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 認証サービス。
+ * <p>
+ * ログイン・リフレッシュトークン発行・トークンローテーション・ハッシュ化等を提供。
+ * <ul>
+ * <li>ログイン: メール・パスワード認証、JWT発行、リフレッシュトークン保存</li>
+ * <li>リフレッシュ: 有効なリフレッシュトークンでアクセストークン再発行、旧トークン失効</li>
+ * <li>ハッシュ化: トークンのSHA-256ハッシュ化</li>
+ * </ul>
+ * 
+ * @see com.example.backend.service.JwtTokenService
+ * @see com.example.backend.repository.RefreshTokenRepository
+ */
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -36,7 +49,19 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final java.time.Clock clock;
 
-    // ログイン処理
+    /**
+     * ログイン処理。
+     * <p>
+     * メール・パスワード認証し、JWTアクセストークン・リフレッシュトークンを発行。ユーザーがACTIVEでない場合は例外。
+     * </p>
+     * 
+     * @param request   ログインリクエスト
+     * @param userAgent ユーザーエージェント
+     * @param ipAddress IPアドレス
+     * @return 署名済みのアクセストークン・リフレッシュトークンDTO
+     * @throws com.example.backend.exception.InvalidCredentialsException 認証失敗時
+     * @throws com.example.backend.exception.AccountDisabledException    アカウント無効時
+     */
     @Transactional
     public AuthResponseDto login(LoginRequestDto request, String userAgent, String ipAddress) {
         User user = userRepository.findByEmail(request.email())
@@ -75,7 +100,19 @@ public class AuthService {
         return new AuthResponseDto(pair.accessToken(), pair.refreshToken(), "Bearer", expiresIn);
     }
 
-    // トークンのリフレッシュ
+    /**
+     * リフレッシュトークンによるトークン再発行。
+     * <p>
+     * 有効なリフレッシュトークンを検証し、アクセストークン・リフレッシュトークンを再発行。旧トークンは失効。ユーザーがACTIVEでない場合は例外。
+     * </p>
+     * 
+     * @param refreshTokenRaw 元のリフレッシュトークン文字列
+     * @param userAgent       ユーザーエージェント
+     * @param ipAddress       IPアドレス
+     * @return 署名済みの新しいアクセストークン・リフレッシュトークンDTO
+     * @throws com.example.backend.exception.InvalidRefreshTokenException トークン不正・期限切れ・失効時
+     * @throws com.example.backend.exception.AccountDisabledException     アカウント無効時
+     */
     @Transactional
     public AuthResponseDto refresh(String refreshTokenRaw, String userAgent, String ipAddress) {
         String hash = sha256Hex(refreshTokenRaw);
@@ -133,7 +170,16 @@ public class AuthService {
         return new AuthResponseDto(pair.accessToken(), pair.refreshToken(), "Bearer", expiresIn);
     }
 
-    // SHA-256 ハッシュを生成（トークンの保存に使用）
+    /**
+     * SHA-256ハッシュを計算。
+     * <p>
+     * トークン等のハッシュ化に利用。
+     * </p>
+     * 
+     * @param value 入力文字列
+     * @return SHA-256ハッシュの16進文字列
+     * @throws IllegalStateException SHA-256アルゴリズムが利用できない場合
+     */
     private static String sha256Hex(String value) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");

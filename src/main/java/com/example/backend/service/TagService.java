@@ -128,11 +128,15 @@ public class TagService {
     }
 
     /**
-     * IDでタグの取得
+     * 指定したIDリストに対応するタグエンティティを全件取得する。
+     * <p>
+     * 入力リストの順序を保持して返却し、存在しないIDが含まれる場合は例外をスローする。
+     * 主に投稿作成・編集時のタグ一括取得やバリデーション用途で利用。
+     * </p>
      * 
-     * @param ids タグIDのリスト
+     * @param ids タグIDのリスト（nullまたは空の場合は空リストを返す）
      * @return タグのリスト（入力順）
-     * @throws IllegalArgumentException 存在しないタグが含まれる場合
+     * @throws IllegalArgumentException 存在しないタグIDが含まれる場合
      */
     @Transactional(readOnly = true)
     public List<Tag> findAllByIds(List<Long> ids) {
@@ -153,11 +157,15 @@ public class TagService {
     }
 
     /**
-     * タグ名の正規化
+     * タグ名を正規化し、バリデーションを行うユーティリティ。
+     * <p>
+     * 前後空白を除去し、許可パターン（日本語・記号・スラッシュ等含む）に合致しない場合は例外をスローする。
+     * 小文字化は行わず、入力値をそのまま保持する。
+     * </p>
      * 
-     * @param value タグ名
-     * @return 正規化されたタグ名
-     * @throws IllegalArgumentException 無効なタグ名の場合
+     * @param value タグ名（null不可、空白不可）
+     * @return 正規化・バリデーション済みのタグ名
+     * @throws IllegalArgumentException 無効なタグ名（null/空白/パターン不一致）の場合
      */
     private String normalizeName(String value) {
         if (value == null) {
@@ -177,11 +185,15 @@ public class TagService {
     }
 
     /**
-     * スラッグの正規化
-     *
-     * @param value スラッグ
-     * @return 正規化されたスラッグ
-     * @throws IllegalArgumentException 無効なスラッグの場合
+     * タグのスラッグ値を正規化し、バリデーションを行うユーティリティ。
+     * <p>
+     * 前後空白を除去し、小文字化した上で[a-z0-9-]{1,255}パターンに合致しない場合は例外をスローする。
+     * タグ新規作成・編集時の一意性・URL整形用途で利用。
+     * </p>
+     * 
+     * @param value スラッグ（null不可、空白不可）
+     * @return 正規化・バリデーション済みのスラッグ
+     * @throws IllegalArgumentException 無効なスラッグ（null/空白/パターン不一致）の場合
      */
     public String normalizeSlug(String value) {
         if (value == null) {

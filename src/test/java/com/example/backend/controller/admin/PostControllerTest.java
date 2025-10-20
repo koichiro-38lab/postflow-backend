@@ -25,10 +25,13 @@ import java.util.List;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import org.springframework.transaction.annotation.Transactional;
+
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import({ TestClockConfig.class, TestDataConfig.class })
 @org.springframework.test.context.ActiveProfiles("test")
+@Transactional
 class PostControllerTest {
     @Autowired
     MockMvc mockMvc;
@@ -212,10 +215,12 @@ class PostControllerTest {
         // 実際のauthorIdを取得
         Long authorId = userRepository.findByEmail("editor@example.com").orElseThrow().getId();
 
+        String uniqueSlug = "original-slug-" + System.currentTimeMillis();
+
         // まず editor で投稿作成
         var req = PostRequestDto.builder()
                 .title("original")
-                .slug("original-slug")
+                .slug(uniqueSlug)
                 .status("DRAFT")
                 .contentJson("{\"ops\":[{\"insert\":\"body\"}]}")
                 .authorId(authorId)
@@ -231,7 +236,7 @@ class PostControllerTest {
         // other で更新
         var updateReq = PostRequestDto.builder()
                 .title("hacked")
-                .slug("original-slug")
+                .slug(uniqueSlug)
                 .status("DRAFT")
                 .contentJson("{\"ops\":[{\"insert\":\"body\"}]}")
                 .authorId(2L)

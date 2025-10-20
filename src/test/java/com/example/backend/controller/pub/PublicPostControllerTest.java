@@ -171,6 +171,87 @@ class PublicPostControllerTest {
                 .andExpect(jsonPath("$.content[0].slug").value("java-post"));
     }
 
+    // カテゴリフィルターによる投稿の取得テスト
+    @Test
+    void getPosts_withCategoryFilter_returnsFilteredPosts() throws Exception {
+        // Technologyカテゴリの投稿
+        postRepository.save(Post.builder()
+                .title("Tech Post")
+                .slug("tech-post")
+                .status(Post.Status.PUBLISHED)
+                .excerpt("Tech content")
+                .contentJson("{\"type\":\"doc\",\"content\":[]}")
+                .author(author)
+                .category(category)
+                .publishedAt(LocalDateTime.now(clock).minusDays(1))
+                .build());
+
+        // 別のカテゴリを作成
+        Category newsCategory = categoryRepository.save(Category.builder()
+                .name("News")
+                .slug("news")
+                .sortOrder(2)
+                .build());
+
+        // Newsカテゴリの投稿
+        postRepository.save(Post.builder()
+                .title("News Post")
+                .slug("news-post")
+                .status(Post.Status.PUBLISHED)
+                .excerpt("News content")
+                .contentJson("{\"type\":\"doc\",\"content\":[]}")
+                .author(author)
+                .category(newsCategory)
+                .publishedAt(LocalDateTime.now(clock).minusDays(1))
+                .build());
+
+        mockMvc.perform(get("/api/public/posts?category=technology"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].slug").value("tech-post"));
+    }
+
+    // 複数カテゴリフィルターによる投稿の取得テスト
+    @Test
+    void getPosts_withCategoriesFilter_returnsFilteredPosts() throws Exception {
+        // Technologyカテゴリの投稿
+        postRepository.save(Post.builder()
+                .title("Tech Post")
+                .slug("tech-post")
+                .status(Post.Status.PUBLISHED)
+                .excerpt("Tech content")
+                .contentJson("{\"type\":\"doc\",\"content\":[]}")
+                .author(author)
+                .category(category)
+                .publishedAt(LocalDateTime.now(clock).minusDays(1))
+                .build());
+
+        // 別のカテゴリを作成
+        Category newsCategory = categoryRepository.save(Category.builder()
+                .name("News")
+                .slug("news")
+                .sortOrder(2)
+                .build());
+
+        // Newsカテゴリの投稿
+        postRepository.save(Post.builder()
+                .title("News Post")
+                .slug("news-post")
+                .status(Post.Status.PUBLISHED)
+                .excerpt("News content")
+                .contentJson("{\"type\":\"doc\",\"content\":[]}")
+                .author(author)
+                .category(newsCategory)
+                .publishedAt(LocalDateTime.now(clock).minusDays(1))
+                .build());
+
+        mockMvc.perform(get("/api/public/posts?categories=technology,news"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content.length()").value(2));
+    }
+
     // スラッグによる投稿詳細の取得テスト
     @Test
     void getPostBySlug_returnsPublishedPost() throws Exception {
@@ -217,6 +298,24 @@ class PublicPostControllerTest {
     @Test
     void getPostBySlug_notFound_returns404() throws Exception {
         mockMvc.perform(get("/api/public/posts/non-existent"))
+                .andExpect(status().isNotFound());
+    }
+
+    // 未来公開日の投稿取得テスト
+    @Test
+    void getPostBySlug_futurePost_returns404() throws Exception {
+        postRepository.save(Post.builder()
+                .title("Future Post")
+                .slug("future-post")
+                .status(Post.Status.PUBLISHED)
+                .excerpt("Future excerpt")
+                .contentJson("{\"type\":\"doc\",\"content\":[]}")
+                .author(author)
+                .category(category)
+                .publishedAt(LocalDateTime.now(clock).plusDays(1))
+                .build());
+
+        mockMvc.perform(get("/api/public/posts/future-post"))
                 .andExpect(status().isNotFound());
     }
 

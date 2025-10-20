@@ -11,7 +11,12 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * 公開API: カテゴリエンドポイント（認証不要）
+ * 公開カテゴリAPIコントローラー。
+ * <p>
+ * 認証不要で公開投稿に紐づくカテゴリ一覧を取得可能。
+ * </p>
+ * 
+ * @see com.example.backend.service.PublicCategoryService
  */
 @RestController
 @RequestMapping("/api/public/categories")
@@ -21,8 +26,10 @@ public class PublicCategoryController {
     private final PublicCategoryService publicCategoryService;
 
     /**
-     * 公開投稿に紐づくカテゴリ一覧を取得
-     * GET /api/public/categories
+     * 公開投稿に紐づくカテゴリ一覧を取得。
+     * <p>
+     * 認証不要。公開状態の投稿に紐づくカテゴリのみ返却。
+     * </p>
      * 
      * @return 公開カテゴリのリスト
      */

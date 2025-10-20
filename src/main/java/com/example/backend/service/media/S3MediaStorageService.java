@@ -28,6 +28,19 @@ import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignReques
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 import software.amazon.awssdk.services.s3.S3Configuration;
 
+/**
+ * AWS S3/MinIO等のオブジェクトストレージと連携し、
+ * 署名付きURL発行・存在検証・削除などのメディア操作を提供する実装クラス。
+ * <p>
+ * {@link MediaStorage}インターフェースのS3実装。
+ * バケット名・認証情報・エンドポイント等はMediaStorageProperties経由で注入。
+ * <ul>
+ * <li>管理画面・API経由の画像/ファイルアップロード・ダウンロード用途</li>
+ * <li>署名付きURLは有効期限付きで発行</li>
+ * <li>MinIO等のS3互換ストレージにも対応</li>
+ * </ul>
+ * </p>
+ */
 @RequiredArgsConstructor
 public class S3MediaStorageService implements MediaStorage {
 
@@ -36,6 +49,17 @@ public class S3MediaStorageService implements MediaStorage {
     private final MediaStorageProperties properties;
     private final Clock clock;
 
+    /**
+     * S3に対し署名付きアップロードURLを発行する。
+     * 
+     * @param storageKey    ストレージ内の保存先キー
+     * @param contentType   Content-Type
+     * @param contentLength バイト長
+     * @param ttl           URL有効期間
+     * @return PresignedUpload情報
+     * @throws IllegalArgumentException 引数不正時
+     * @throws StorageException         S3連携失敗時
+     */
     @Override
     public PresignedUpload createUploadUrl(String storageKey, String contentType, long contentLength, Duration ttl) {
         if (storageKey == null || storageKey.isBlank()) {
@@ -71,6 +95,15 @@ public class S3MediaStorageService implements MediaStorage {
         }
     }
 
+    /**
+     * S3に対し署名付きダウンロードURLを発行する。
+     * 
+     * @param storageKey ストレージ内の保存先キー
+     * @param ttl        URL有効期間
+     * @return PresignedDownload情報
+     * @throws IllegalArgumentException 引数不正時
+     * @throws StorageException         S3連携失敗時
+     */
     @Override
     public PresignedDownload createDownloadUrl(String storageKey, Duration ttl) {
         if (storageKey == null || storageKey.isBlank()) {
@@ -89,6 +122,13 @@ public class S3MediaStorageService implements MediaStorage {
         }
     }
 
+    /**
+     * 指定キーのオブジェクトがS3上に存在するか検証する。
+     * 
+     * @param storageKey ストレージ内の保存先キー
+     * @throws ObjectNotFoundException オブジェクトが存在しない場合
+     * @throws StorageException        S3連携失敗時
+     */
     @Override
     public void ensureObjectExists(String storageKey) {
         try {
@@ -108,6 +148,12 @@ public class S3MediaStorageService implements MediaStorage {
         }
     }
 
+    /**
+     * 指定キーのオブジェクトをS3から削除する。
+     * 
+     * @param storageKey ストレージ内の保存先キー
+     * @throws StorageException S3連携失敗時
+     */
     @Override
     public void deleteObject(String storageKey) {
         try {
@@ -120,6 +166,17 @@ public class S3MediaStorageService implements MediaStorage {
         }
     }
 
+    /**
+     * S3ClientをMediaStoragePropertiesから構築するユーティリティ。
+     * <ul>
+     * <li>region, endpoint, pathStyle, credentials等を反映</li>
+     * <li>MinIO等のS3互換ストレージにも対応</li>
+     * </ul>
+     * 
+     * @param properties ストレージ設定
+     * @return S3Clientインスタンス
+     * @throws IllegalArgumentException 設定不正時
+     */
     public static S3Client buildClient(MediaStorageProperties properties) {
         if (properties == null)
             throw new IllegalArgumentException("properties must not be null");
@@ -145,6 +202,17 @@ public class S3MediaStorageService implements MediaStorage {
         return builder.build();
     }
 
+    /**
+     * S3PresignerをMediaStoragePropertiesから構築するユーティリティ。
+     * <ul>
+     * <li>region, endpoint, pathStyle, credentials等を反映</li>
+     * <li>MinIO等のS3互換ストレージにも対応</li>
+     * </ul>
+     * 
+     * @param properties ストレージ設定
+     * @return S3Presignerインスタンス
+     * @throws IllegalArgumentException 設定不正時
+     */
     public static S3Presigner buildPresigner(MediaStorageProperties properties) {
         if (properties == null)
             throw new IllegalArgumentException("properties must not be null");
@@ -167,6 +235,15 @@ public class S3MediaStorageService implements MediaStorage {
         return builder.build();
     }
 
+    /**
+     * MediaStoragePropertiesから認証情報を解決するユーティリティ。
+     * <ul>
+     * <li>accessKey/secretKey指定時はStatic、未指定時はDefaultProvider</li>
+     * </ul>
+     * 
+     * @param properties ストレージ設定
+     * @return AwsCredentialsProvider
+     */
     private static AwsCredentialsProvider resolveCredentials(MediaStorageProperties properties) {
         if (properties.getAccessKey() != null && properties.getSecretKey() != null) {
             AwsBasicCredentials basic = AwsBasicCredentials.create(properties.getAccessKey(),

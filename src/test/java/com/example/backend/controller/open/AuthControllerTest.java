@@ -183,4 +183,73 @@ class AuthControllerTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    // ログイン失敗（バリデーションエラー：空のメールアドレス）
+    @Test
+    void login_validationError_emptyEmail() throws Exception {
+        var req = new LoginRequestDto("", "password123");
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.messages").isArray());
+    }
+
+    // ログイン失敗（バリデーションエラー：空のパスワード）
+    @Test
+    void login_validationError_emptyPassword() throws Exception {
+        var req = new LoginRequestDto("admin@example.com", "");
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.messages").isArray());
+    }
+
+    // リフレッシュ失敗（バリデーションエラー：空のトークン）
+    @Test
+    void refresh_validationError_emptyToken() throws Exception {
+        var req = new RefreshRequestDto("");
+        mockMvc.perform(post("/api/auth/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.messages").isArray());
+    }
+
+    // IP解決テスト（X-Forwarded-For ヘッダーなし）
+    @Test
+    void login_withRemoteAddr_usesRemoteAddr() throws Exception {
+        var req = new LoginRequestDto("admin@example.com", "password123");
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req))
+                .with(request -> {
+                    // RemoteAddr を設定
+                    request.setRemoteAddr("192.168.1.100");
+                    return request;
+                }))
+                .andExpect(status().isOk());
+    }
+
+    // IP解決テスト（X-Forwarded-For ヘッダーあり）
+    @Test
+    void login_withXForwardedFor_usesXForwardedFor() throws Exception {
+        var req = new LoginRequestDto("admin@example.com", "password123");
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req))
+                .header("X-Forwarded-For", "203.0.113.1"))
+                .andExpect(status().isOk());
+    }
+
+    // IP解決テスト（X-Forwarded-For ヘッダーに複数IP、カンマ区切り）
+    @Test
+    void login_withXForwardedFor_multipleIps_usesFirst() throws Exception {
+        var req = new LoginRequestDto("admin@example.com", "password123");
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req))
+                .header("X-Forwarded-For", "203.0.113.1, 198.51.100.1, 192.0.2.1"))
+                .andExpect(status().isOk());
+    }
 }

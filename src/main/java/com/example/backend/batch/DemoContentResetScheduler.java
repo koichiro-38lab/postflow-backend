@@ -17,7 +17,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.core.io.support.ResourcePatternResolver;
@@ -30,6 +29,7 @@ import org.springframework.context.event.EventListener;
 
 import com.example.backend.config.DemoResetProperties;
 import com.example.backend.config.MediaStorageProperties;
+import com.example.backend.repository.UserRepository;
 
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -68,7 +68,7 @@ public class DemoContentResetScheduler {
 
     public DemoContentResetScheduler(DataSource dataSource, S3Client s3Client,
             MediaStorageProperties mediaStorageProperties, DemoResetProperties demoResetProperties,
-            ResourceLoader resourceLoader) {
+            ResourceLoader resourceLoader, UserRepository userRepository) {
         this.dataSource = dataSource;
         this.s3Client = s3Client;
         this.mediaStorageProperties = mediaStorageProperties;
@@ -125,9 +125,10 @@ public class DemoContentResetScheduler {
     }
 
     /**
-     * 簡易シードを実行（初回起動時用）。
+     * 簡易シードを実行(初回起動時用)。
      * ユーザー3名・カテゴリ2件・タグ5件・サンプル投稿1件のみ投入。
      * メディアアップロードは行わない。
+     * 既にユーザーが存在する場合はスキップ（フルシード投入後の再起動対策）。
      */
     public void executeMinimalSeed() {
         if (!running.compareAndSet(false, true)) {
@@ -182,11 +183,24 @@ public class DemoContentResetScheduler {
      * @param scriptPath SQLスクリプトのクラスパス相対パス
      */
     private void resetDatabaseWithScript(String scriptPath) {
+        Resource scriptResource = resolveSeedScript(scriptPath);
         try (Connection connection = this.dataSource.getConnection()) {
-            ScriptUtils.executeSqlScript(connection, new ClassPathResource(scriptPath));
+            ScriptUtils.executeSqlScript(connection, scriptResource);
         } catch (Exception ex) {
-            throw new IllegalStateException("Failed to reset database using " + scriptPath, ex);
+            throw new IllegalStateException(
+                    "Failed to reset database using script " + scriptResource.getDescription(), ex);
         }
+    }
+
+    private Resource resolveSeedScript(String scriptPath) {
+        if (!StringUtils.hasText(scriptPath)) {
+            throw new IllegalArgumentException("Seed script path must not be empty");
+        }
+        Resource resource = resourcePatternResolver.getResource(scriptPath);
+        if (!resource.exists()) {
+            throw new IllegalStateException("Seed script not found: " + scriptPath);
+        }
+        return resource;
     }
 
     /**

@@ -881,15 +881,25 @@ class UserControllerTest {
     void createUser_withBioAndAvatar_should_return_201() throws Exception {
         String accessToken = getAccessToken("admin@example.com", "password123");
 
+        // テスト用メディアを作成
+        Media media = new Media();
+        media.setFilename("test-avatar.png");
+        media.setStorageKey("sk-test-avatar-" + System.currentTimeMillis());
+        media.setMime("image/png");
+        media.setCreatedBy(userRepository.findById(1L).orElseThrow());
+        media = mediaRepository.save(media);
+        createdMediaIds.add(media.getId());
+
         String uniqueEmail = "withbio" + System.currentTimeMillis() + "@example.com";
-        var req = new UserRequestDto(uniqueEmail, "password123", "AUTHOR", "Test User", "This is a test bio", 1L);
+        var req = new UserRequestDto(uniqueEmail, "password123", "AUTHOR", "Test User", "This is a test bio",
+                media.getId());
         var createRes = mockMvc.perform(post("/api/admin/users")
                 .header("Authorization", "Bearer " + accessToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.bio").value("This is a test bio"))
-                .andExpect(jsonPath("$.avatarMediaId").value(1))
+                .andExpect(jsonPath("$.avatarMediaId").value(media.getId().intValue()))
                 .andReturn().getResponse().getContentAsString();
         Long userId = Long.valueOf((Integer) JsonPath.read(createRes, "$.id"));
         createdUserIds.add(userId);

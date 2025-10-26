@@ -22,6 +22,6 @@ public class DemoResetProperties {
 
     // 簡易シード設定
     private boolean minimalSeedOnStartup = true;
-    private String minimalSeedScript = "db/seed/seed_minimal.sql";
-    private String fullSeedScript = "db/seed/seed_full.sql";
+    private String minimalSeedScript = "classpath:db/seed/seed_minimal.sql";
+    private String fullSeedScript = "classpath:db/seed/seed_full.sql";
 }

@@ -64,8 +64,8 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(java.util.Arrays.asList(
                 "http://localhost:*",
-                "http://100.118.151.11:*" // 開発用Tailscale IPを追加
-        ));
+                "http://100.118.151.11:*", // 開発用Tailscale IPを追加
+                "https://demo.postflow.work"));
         configuration.setAllowedMethods(java.util.Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(java.util.Arrays.asList("*"));
         configuration.setAllowCredentials(true);

@@ -4,10 +4,8 @@ package com.example.backend.batch;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.Connection;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -64,6 +62,7 @@ public class DemoContentResetScheduler {
     private final MediaStorageProperties mediaStorageProperties;
     private final DemoResetProperties demoResetProperties;
     private final ResourcePatternResolver resourcePatternResolver;
+    private final UserRepository userRepository;
     private final AtomicBoolean running = new AtomicBoolean(false);
 
     public DemoContentResetScheduler(DataSource dataSource, S3Client s3Client,
@@ -74,6 +73,7 @@ public class DemoContentResetScheduler {
         this.mediaStorageProperties = mediaStorageProperties;
         this.demoResetProperties = demoResetProperties;
         this.resourcePatternResolver = ResourcePatternUtils.getResourcePatternResolver(resourceLoader);
+        this.userRepository = userRepository;
     }
 
     /**
@@ -136,6 +136,12 @@ public class DemoContentResetScheduler {
             return;
         }
         try {
+            // ユーザーが既に存在する場合はスキップ
+            if (userRepository.count() > 0) {
+                log.info("Minimal seed: users already exist, skipping seed execution");
+                return;
+            }
+
             log.info("Minimal seed: start");
             resetDatabaseWithScript(demoResetProperties.getMinimalSeedScript());
             log.info("Minimal seed: completed");
@@ -297,16 +303,15 @@ public class DemoContentResetScheduler {
      * @param filename
      * @return
      */
+    /**
+     * S3保存用のストレージキーを構築。
+     * sampleディレクトリ配下に格納。
+     * 
+     * @param filename ファイル名
+     * @return S3キー（例: sample/sample-59.avif）
+     */
     private String buildStorageKey(String filename) {
-        List<String> segments = new ArrayList<>();
-        if (StringUtils.hasText(mediaStorageProperties.getKeyPrefix())) {
-            segments.add(trimSlashes(mediaStorageProperties.getKeyPrefix()));
-        }
-        if (StringUtils.hasText(demoResetProperties.getMediaFolder())) {
-            segments.add(trimSlashes(demoResetProperties.getMediaFolder()));
-        }
-        segments.add(trimLeadingSlash(Objects.requireNonNull(filename)));
-        return String.join("/", segments);
+        return "sample/" + trimLeadingSlash(Objects.requireNonNull(filename));
     }
 
     /**
@@ -315,32 +320,14 @@ public class DemoContentResetScheduler {
      * 
      * @return
      */
-    private String resolveObjectPrefix() {
-        List<String> segments = new ArrayList<>();
-        if (StringUtils.hasText(mediaStorageProperties.getKeyPrefix())) {
-            segments.add(trimSlashes(mediaStorageProperties.getKeyPrefix()));
-        }
-        if (StringUtils.hasText(demoResetProperties.getMediaFolder())) {
-            segments.add(trimSlashes(demoResetProperties.getMediaFolder()));
-        }
-        return String.join("/", segments);
-    }
-
     /**
-     * 文字列の先頭・末尾のスラッシュを削除。
+     * S3オブジェクトプレフィックスを構築。
+     * sampleディレクトリ固定。
      * 
-     * @param value
-     * @return
+     * @return S3プレフィックス（例: sample）
      */
-    private String trimSlashes(String value) {
-        String v = value;
-        while (v.startsWith("/")) {
-            v = v.substring(1);
-        }
-        while (v.endsWith("/")) {
-            v = v.substring(0, v.length() - 1);
-        }
-        return v;
+    private String resolveObjectPrefix() {
+        return "sample";
     }
 
     /**

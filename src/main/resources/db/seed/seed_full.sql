@@ -60,30 +60,30 @@ SELECT name, slug FROM seed;
 -- アバター用メディア（ユーザー用の固定画像）
 INSERT INTO media (filename, storage_key, mime, width, height, bytes, alt_text, created_by, created_at)
 VALUES
-('avator_1.webp', 'media/avator_1.webp', 'image/webp', 512, 512, 84256, '神谷 浩一のアバター画像', 1, now()),
-('avator_2.webp', 'media/avator_2.webp', 'image/webp', 512, 512, 79200, '大橋 涼太のアバター画像', 2, now()),
-('avator_3.webp', 'media/avator_3.webp', 'image/webp', 512, 512, 80640, '佐藤 美咲のアバター画像', 3, now());
+('avator_1.webp', 'sample/avator_1.webp', 'image/webp', 512, 512, 84256, '神谷 浩一のアバター画像', 1, now()),
+('avator_2.webp', 'sample/avator_2.webp', 'image/webp', 512, 512, 79200, '大橋 涼太のアバター画像', 2, now()),
+('avator_3.webp', 'sample/avator_3.webp', 'image/webp', 512, 512, 80640, '佐藤 美咲のアバター画像', 3, now());
 
 UPDATE users u
 SET avatar_media_id = m.id
 FROM media m
-WHERE u.email = 'admin@example.com' AND m.storage_key = 'media/avator_1.webp';
+WHERE u.email = 'admin@example.com' AND m.storage_key = 'sample/avator_1.webp';
 
 UPDATE users u
 SET avatar_media_id = m.id
 FROM media m
-WHERE u.email = 'editor@example.com' AND m.storage_key = 'media/avator_2.webp';
+WHERE u.email = 'editor@example.com' AND m.storage_key = 'sample/avator_2.webp';
 
 UPDATE users u
 SET avatar_media_id = m.id
 FROM media m
-WHERE u.email = 'author@example.com' AND m.storage_key = 'media/avator_3.webp';
+WHERE u.email = 'author@example.com' AND m.storage_key = 'sample/avator_3.webp';
 
 -- メディア（100件）
 WITH media_seed AS (
 SELECT gs AS idx,
 format('sample-%s.avif', gs) AS filename,
-format('media/sample-%s.avif', gs) AS storage_key,
+format('sample/sample-%s.avif', gs) AS storage_key,
 'image/avif' AS mime,
 1200 + ((gs % 5) * 120) AS width,
 800 + ((gs % 4) * 90)   AS height,
@@ -142,7 +142,7 @@ WITH post_seed AS (
         jsonb_build_object('type', 'text', 'text', '負荷試験とパフォーマンス改善')
     )),
     jsonb_build_object('type', 'mediaImage', 'attrs', jsonb_build_object(
-        'src', concat('media/sample-', ((gs * 37 + 23) % 100) + 1, '.avif'),
+        'src', concat('sample/sample-', ((gs * 37 + 23) % 100) + 1, '.avif'),
         'alt', concat('負荷試験とパフォーマンス改善イメージ ', gs),
         'link', null,
         'size', 'lg',
@@ -164,7 +164,7 @@ WITH post_seed AS (
         jsonb_build_object('type', 'text', 'text', 'インフラ設計とクラウド運用')
     )),
     jsonb_build_object('type', 'mediaImage', 'attrs', jsonb_build_object(
-        'src', concat('media/sample-', ((gs * 41 + 29) % 100) + 1, '.avif'),
+        'src', concat('sample/sample-', ((gs * 41 + 29) % 100) + 1, '.avif'),
         'alt', concat('インフラ設計とクラウド運用イメージ ', gs),
         'link', null,
         'size', 'lg',
@@ -201,7 +201,7 @@ WITH post_seed AS (
         jsonb_build_object('type', 'text', 'text', 'API設計と統合戦略')
     )),
     jsonb_build_object('type', 'mediaImage', 'attrs', jsonb_build_object(
-        'src', concat('media/sample-', ((gs * 43 + 31) % 100) + 1, '.avif'),
+        'src', concat('sample/sample-', ((gs * 43 + 31) % 100) + 1, '.avif'),
         'alt', concat('API設計と統合戦略イメージ ', gs),
         'link', null,
         'size', 'lg',
@@ -241,7 +241,7 @@ WITH post_seed AS (
         jsonb_build_object('type', 'text', 'text', 'ドメイン駆動設計の実践')
     )),
     jsonb_build_object('type', 'mediaImage', 'attrs', jsonb_build_object(
-        'src', concat('media/sample-', ((gs * 7 + 1) % 100) + 1, '.avif'),
+        'src', concat('sample/sample-', ((gs * 7 + 1) % 100) + 1, '.avif'),
         'alt', concat('ドメイン駆動設計の実践イメージ ', gs),
         'link', null,
         'size', 'lg',
@@ -280,7 +280,7 @@ WITH post_seed AS (
         jsonb_build_object('type', 'text', 'text', 'トラフィック急増時の耐障害性')
     )),
     jsonb_build_object('type', 'mediaImage', 'attrs', jsonb_build_object(
-        'src', concat('media/sample-', ((gs * 11 + 3) % 100) + 1, '.avif'),
+        'src', concat('sample/sample-', ((gs * 11 + 3) % 100) + 1, '.avif'),
         'alt', concat('トラフィック急増時の耐障害性イメージ ', gs),
         'link', null,
         'size', 'lg',
@@ -309,7 +309,7 @@ WITH post_seed AS (
         jsonb_build_object('type', 'text', 'text', 'CI/CDと品質管理の統合')
     )),
     jsonb_build_object('type', 'mediaImage', 'attrs', jsonb_build_object(
-        'src', concat('media/sample-', ((gs * 13 + 5) % 100) + 1, '.avif'),
+        'src', concat('sample/sample-', ((gs * 13 + 5) % 100) + 1, '.avif'),
         'alt', concat('CI/CDと品質管理の統合イメージ ', gs),
         'link', null,
         'size', 'lg',
@@ -350,7 +350,7 @@ WITH post_seed AS (
         jsonb_build_object('type', 'text', 'text', '振り返りテンプレートの活用')
     )),
     jsonb_build_object('type', 'mediaImage', 'attrs', jsonb_build_object(
-        'src', concat('media/sample-', ((gs * 17 + 7) % 100) + 1, '.avif'),
+        'src', concat('sample/sample-', ((gs * 17 + 7) % 100) + 1, '.avif'),
         'alt', concat('振り返りテンプレートの活用イメージ ', gs),
         'link', null,
         'size', 'lg',
@@ -386,7 +386,7 @@ WITH post_seed AS (
         jsonb_build_object('type', 'text', 'text', 'UIコンポーネント設計とアクセシビリティ')
     )),
     jsonb_build_object('type', 'mediaImage', 'attrs', jsonb_build_object(
-        'src', concat('media/sample-', ((gs * 11 + 3) % 100) + 1, '.avif'),
+        'src', concat('sample/sample-', ((gs * 11 + 3) % 100) + 1, '.avif'),
         'alt', concat('UIコンポーネント設計とアクセシビリティイメージ ', gs),
         'link', null,
         'size', 'lg',
@@ -425,7 +425,7 @@ WITH post_seed AS (
         jsonb_build_object('type', 'text', 'text', 'データフェッチングとキャッシュ戦略')
     )),
     jsonb_build_object('type', 'mediaImage', 'attrs', jsonb_build_object(
-        'src', concat('media/sample-', ((gs * 13 + 5) % 100) + 1, '.avif'),
+        'src', concat('sample/sample-', ((gs * 13 + 5) % 100) + 1, '.avif'),
         'alt', concat('データフェッチングとキャッシュ戦略イメージ ', gs),
         'link', null,
         'size', 'lg',
@@ -463,7 +463,7 @@ WITH post_seed AS (
         jsonb_build_object('type', 'text', 'text', 'デザインシステムとテーマ管理')
     )),
     jsonb_build_object('type', 'mediaImage', 'attrs', jsonb_build_object(
-        'src', concat('media/sample-', ((gs * 19 + 11) % 100) + 1, '.avif'),
+        'src', concat('sample/sample-', ((gs * 19 + 11) % 100) + 1, '.avif'),
         'alt', concat('デザインシステムとテーマ管理イメージ ', gs),
         'link', null,
         'size', 'lg',
@@ -529,7 +529,7 @@ WITH post_seed AS (
         jsonb_build_object('type', 'text', 'text', 'キャッシュ無効化手順')
     )),
     jsonb_build_object('type', 'mediaImage', 'attrs', jsonb_build_object(
-        'src', concat('media/sample-', ((gs * 23 + 13) % 100) + 1, '.avif'),
+        'src', concat('sample/sample-', ((gs * 23 + 13) % 100) + 1, '.avif'),
         'alt', concat('キャッシュ無効化手順イメージ ', gs),
         'link', null,
         'size', 'lg',
@@ -568,7 +568,7 @@ WITH post_seed AS (
         jsonb_build_object('type', 'text', 'text', 'マルチクラウド環境の構築')
     )),
     jsonb_build_object('type', 'mediaImage', 'attrs', jsonb_build_object(
-        'src', concat('media/sample-', ((gs * 29 + 17) % 100) + 1, '.avif'),
+        'src', concat('sample/sample-', ((gs * 29 + 17) % 100) + 1, '.avif'),
         'alt', concat('マルチクラウド環境の構築イメージ ', gs),
         'link', null,
         'size', 'lg',
@@ -608,7 +608,7 @@ WITH post_seed AS (
         jsonb_build_object('type', 'text', 'text', 'KPI駆動の改善サイクル')
     )),
     jsonb_build_object('type', 'mediaImage', 'attrs', jsonb_build_object(
-        'src', concat('media/sample-', ((gs * 31 + 19) % 100) + 1, '.avif'),
+        'src', concat('sample/sample-', ((gs * 31 + 19) % 100) + 1, '.avif'),
         'alt', concat('KPI駆動の改善サイクルイメージ ', gs),
         'link', null,
         'size', 'lg',

@@ -324,16 +324,24 @@ class DemoContentResetSchedulerTest {
     }
 
     /**
-     * S3オブジェクトプレフィックスが空の場合、安全のため削除がスキップされることを確認。
+     * S3オブジェクトプレフィックスが"sample"固定のため、削除とアップロードが実行されることを確認。
+     * （修正前：プレフィックスが空の場合スキップ → 修正後：sample固定で常に実行）
      */
     @Test
     void resetDemoContent_emptyObjectPrefix_shouldSkipPurge() throws Exception {
         // 簡易シード無効化
         demoResetProperties.setMinimalSeedOnStartup(false);
 
-        // プレフィックスを空に設定
+        // プレフィックスを空に設定（実装上は"sample"固定のため影響なし）
         mediaStorageProperties.setKeyPrefix("");
         demoResetProperties.setMediaFolder("");
+
+        // S3モックの設定（sample/配下にオブジェクトが存在する想定）
+        ListObjectsV2Response emptyResponse = ListObjectsV2Response.builder()
+                .contents(new ArrayList<>())
+                .nextContinuationToken(null)
+                .build();
+        when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(emptyResponse);
 
         // サンプルメディアのモック設定
         setupSampleMediaMocks();
@@ -341,8 +349,10 @@ class DemoContentResetSchedulerTest {
         // 実行
         scheduler.resetDemoContent();
 
-        // 削除は呼ばれないが、アップロードは実行される
+        // sample/配下を削除しようとする（オブジェクトがないため削除は呼ばれない）
+        verify(s3Client, atLeastOnce()).listObjectsV2(any(ListObjectsV2Request.class));
         verify(s3Client, never()).deleteObject(any(DeleteObjectRequest.class));
+        // アップロードは実行される
         verify(s3Client, atLeastOnce()).putObject(any(PutObjectRequest.class), any(RequestBody.class));
     }
 

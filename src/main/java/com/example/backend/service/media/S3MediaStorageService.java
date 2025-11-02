@@ -1,5 +1,6 @@
 package com.example.backend.service.media;
 
+import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -226,8 +227,12 @@ public class S3MediaStorageService implements MediaStorage {
         if (credentials != null) {
             builder.credentialsProvider(credentials);
         }
-        if (properties.getEndpoint() != null) {
-            builder.endpointOverride(properties.getEndpoint());
+        // Use presignerEndpoint if set, otherwise fall back to endpoint
+        URI presignerEndpoint = properties.getPresignerEndpoint() != null
+                ? properties.getPresignerEndpoint()
+                : properties.getEndpoint();
+        if (presignerEndpoint != null) {
+            builder.endpointOverride(presignerEndpoint);
         }
         builder.serviceConfiguration(S3Configuration.builder()
                 .pathStyleAccessEnabled(properties.isPathStyleAccess())

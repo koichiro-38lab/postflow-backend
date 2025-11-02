@@ -29,6 +29,13 @@ public class MediaStorageProperties {
     private URI endpoint;
 
     /**
+     * Optional custom endpoint for presigner (e.g.
+     * https://demo.postflow.work/media).
+     * If not set, falls back to endpoint.
+     */
+    private URI presignerEndpoint;
+
+    /**
      * Optional access key/secret key pair when custom credentials are required.
      */
     private String accessKey;

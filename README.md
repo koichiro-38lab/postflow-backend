@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)]()
 [![Coverage 85%/70%](https://img.shields.io/badge/Coverage-85%2F70%25-green)]()
 
-# PostFlow Backend - エンタープライズ CMS API
+# PostFlow Backend - CMS API
 
 **Spring Boot 3.5 によるモダン RESTful API**
 
